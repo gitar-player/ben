@@ -1,3 +1,5 @@
+#Allwyn's copy of gameserver.py
+
 import os
 import sys
 import platform

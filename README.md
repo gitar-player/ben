@@ -1,3 +1,14 @@
+# Allwyn's notes
+Open terminal at ben folder
+cd src
+conda activate TF2
+python3 gameserver.py
+In another terminal:
+python3 appserver.py
+
+Then open up localhost:8080 in your usual browsert
+Click on play, choose a pbn file from ben/Boards/BBA
+
 # Bridge Engine
 
 This is a game engine for [bridge](https://en.wikipedia.org/wiki/Contract_bridge).

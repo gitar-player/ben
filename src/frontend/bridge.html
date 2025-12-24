@@ -214,6 +214,25 @@
                 document.querySelector(labels[playerTurn] + ' .seat-label').classList.add("turn")
         }
 
+        function attachAuctionCellClickListeners() {
+            const auctionTable = document.querySelector('#auction table')
+            if (!auctionTable) return
+            
+            const tbody = auctionTable.querySelector('tbody')
+            if (!tbody) return
+            
+            const rows = tbody.querySelectorAll('tr')
+            rows.forEach((row, rowIndex) => {
+                const cells = row.querySelectorAll('td')
+                cells.forEach((cell, colIndex) => {
+                    cell.addEventListener('click', function() {
+                        // Row and column are 1-indexed for user display
+                        alert(`Row: ${rowIndex + 1}, Column: ${colIndex + 1}`)
+                    })
+                })
+            })
+        }
+
         function showlasttrick(event) {
             showTrickCardSlots()
         }
@@ -399,6 +418,7 @@
 
                 updateTable(deal)
                 deal.renderAuction(document.querySelector('#auction-container'))
+                attachAuctionCellClickListeners()
                 deal.renderBiddingBox(document.querySelector('#bidding'))
                 document.querySelectorAll('#last-trick')
                     .forEach(c => c.addEventListener('click', showlasttrick))
@@ -410,6 +430,7 @@
             } else if (data.message == "bid_made") {
                 deal.auction = data.auction
                 deal.renderAuction(document.querySelector('#auction-container'))
+                attachAuctionCellClickListeners()
                 explain.innerHTML += data.auction[data.auction.length - 1] +"=" + data.explanation + "<br>"
 
                 deal.turn = (deal.turn + 1) % 4
@@ -458,6 +479,7 @@
 
                 document.querySelector('#bidding').textContent = ''
                 deal.renderAuction(document.querySelector('#auction-container'))
+                attachAuctionCellClickListeners()
 
                 document.querySelectorAll('.card')
                     .forEach(c => c.addEventListener('click', cardClick))

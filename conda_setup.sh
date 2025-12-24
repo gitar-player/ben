@@ -13,9 +13,9 @@ pip install tqdm
 
 pip install websockets
 
-pip install "keras==3.6.0"
 pip install "tensorflow==2.18"
 pip install grpcio-tools
+pip install "keras==3.6.0"
 
 pip install bottle
 pip install flask

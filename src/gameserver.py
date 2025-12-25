@@ -24,6 +24,25 @@ absl.logging.get_absl_handler().python_handler.stream = open(os.devnull, 'w')
 absl.logging.set_verbosity(absl.logging.FATAL)
 absl.logging.set_stderrthreshold(absl.logging.FATAL)
 
+# Fix for protobuf 4.x compatibility with TensorFlow
+# MessageFactory.GetPrototype was removed in protobuf 4.0
+# TensorFlow still expects this method, so we provide a compatibility shim
+try:
+    import google.protobuf.message_factory
+    if not hasattr(google.protobuf.message_factory.MessageFactory, 'GetPrototype'):
+        def GetPrototype(self, descriptor):
+            # Use the new API: GetMessageClass instead of GetPrototype
+            from google.protobuf import message_factory as mf
+            try:
+                # Try the new API first (protobuf 4.x)
+                return mf.GetMessageClass(descriptor)
+            except (AttributeError, TypeError):
+                # Fallback for older protobuf versions
+                return self.GetPrototypeClass(descriptor)
+        google.protobuf.message_factory.MessageFactory.GetPrototype = GetPrototype
+except (ImportError, AttributeError):
+    pass
+
 import tensorflow as tf
 from nn.opponents import Opponents
 

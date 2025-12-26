@@ -1078,7 +1078,7 @@ async def main():
         models.consult_bba = False
         models.use_bba_rollout = False
         models.use_bba_to_count_aces = False
-        #models.use_suitc = False
+        models.use_suitc = False
         
     if models.use_bba:
         print("Using BBA for bidding")

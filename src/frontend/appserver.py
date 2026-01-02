@@ -19,10 +19,20 @@ import numpy as np
 from urllib.parse import parse_qs
 from urllib.parse import quote
 import re
+import logging
+from functools import wraps
 
 
 app = Bottle()
 script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger('appserver')
 
 BUNDLE_TEMP_DIR = ''
 
@@ -285,6 +295,50 @@ def validdeal(board, direction):
         return [hands[1], hands[2], hands[3], hands[0]]
     return hands
 
+# Logging hook for all requests
+@app.hook('before_request')
+def log_request():
+    """Log incoming API requests"""
+    method = request.method
+    path = request.path
+    query_string = request.query_string
+    remote_addr = request.environ.get('REMOTE_ADDR', 'unknown')
+    
+    # Log request details
+    log_msg = f"API Call - Method: {method}, Path: {path}"
+    if query_string:
+        log_msg += f", Query: {query_string}"
+    log_msg += f", IP: {remote_addr}"
+    
+    # For POST requests, log form data (excluding sensitive info)
+    if method == 'POST':
+        form_data = dict(request.forms)
+        # Don't log full deal text to avoid cluttering logs
+        if 'dealtext' in form_data:
+            form_data['dealtext'] = f"[{len(form_data['dealtext'])} chars]"
+        if 'dealpbn' in form_data:
+            form_data['dealpbn'] = f"[{len(form_data['dealpbn'])} chars]"
+        if 'dealbsol' in form_data:
+            form_data['dealbsol'] = f"[{len(form_data['dealbsol'])} chars]"
+        if 'deallin' in form_data:
+            form_data['deallin'] = f"[{len(form_data['deallin'])} chars]"
+        log_msg += f", Form Data: {form_data}"
+    
+    # For JSON requests, log JSON data
+    if request.content_type and 'application/json' in request.content_type:
+        try:
+            json_data = request.json
+            log_msg += f", JSON: {json.dumps(json_data, default=str)[:200]}"
+        except:
+            pass
+    
+    logger.info(log_msg)
+
+@app.hook('after_request')
+def log_response():
+    """Log response status"""
+    status = response.status_code
+    logger.info(f"API Response - Path: {request.path}, Status: {status}")
 
 @app.route('/')
 def index(): 
@@ -503,30 +557,36 @@ def index():
 
 @app.route('/api/deals/<deal_id>')
 def deal_data(deal_id):
+    logger.info(f"GET /api/deals/{deal_id}")
     print("Getting:", deal_id)
     try:
         db = shelve.open(DB_NAME)
         deal = db[deal_id]
         db.close()
-
+        logger.info(f"Successfully retrieved deal {deal_id}")
         return json.dumps(deal)
     except KeyError:
+        logger.warning(f"Deal not found: {deal_id}")
         print("Deal not found")
         raise HTTPError(404, "Deal not found")
 
 @app.route('/api/delete/deal/<deal_id>')
 def delete_deal(deal_id):
+    logger.info(f"DELETE /api/delete/deal/{deal_id}")
     print("Deleting:", deal_id)
     if not is_valid_deal_id(deal_id):
+        logger.warning(f"Invalid deal ID: {deal_id}")
         print("Invalid deal ID")
         raise HTTPError(400, "Invalid deal ID")
     if host != "localhost":
+        logger.warning(f"Unauthorized delete attempt from {host}")
         print("Port not valid")
         raise HTTPError(401, f"Not Auth {host}")
     try:
         db = shelve.open(DB_NAME)
         db.pop(deal_id)
         db.close()
+        logger.info(f"Successfully deleted deal {deal_id}")
         print("Returning to home")
 
         # Get the referrer URL to redirect back to the same page
@@ -538,20 +598,30 @@ def delete_deal(deal_id):
             print("No referrer found, redirecting to default /home")
             return redirect('/home')  # Default fallback
     except KeyError:
+        logger.warning(f"Deal not found for deletion: {deal_id}")
         print("Deal not found")
         raise HTTPError(404, "Deal not found")
 
 @app.route('/api/save/deal', method='POST')
 def save_deal():
+    logger.info("POST /api/save/deal")
     data_dict = request.json  # Get JSON data from the request body
     if data_dict:
+        deal_id = uuid.uuid4().hex
+        # Log deal info without full details
+        contract = data_dict.get('contract', 'Unknown')
+        board_no = data_dict.get('board_number', 'Unknown')
+        logger.info(f"Saving deal - ID: {deal_id}, Contract: {contract}, Board: {board_no}")
+        
         db = shelve.open(DB_NAME)
-        db[uuid.uuid4().hex] = data_dict
+        db[deal_id] = data_dict
         db.close()
+        logger.info(f"Successfully saved deal {deal_id}")
         response.status = 200  # HTTP status code: 200 OK
         response.headers['Content-Type'] = 'application/json'  # Set response content type
         return json.dumps({'message': 'Deal saved successfully'})
     else:
+        logger.warning("Invalid data received in save_deal")
         print("Invalid data received")
         raise HTTPError(400, "Invalid data received")
     

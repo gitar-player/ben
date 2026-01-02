@@ -9,6 +9,8 @@ python3 appserver.py
 Then open up localhost:8080 in your usual browsert
 Click on play, choose a pbn file from ben/Boards/BBA
 
+Retrieve hands from: https://www.bridgebase.com/myhands/
+
 # Bridge Engine
 
 This is a game engine for [bridge](https://en.wikipedia.org/wiki/Contract_bridge).

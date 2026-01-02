@@ -2,46 +2,46 @@
 <html lang="en">
 
 <head>
-  <meta charset="utf-8">
+    <meta charset="utf-8">
 
-  <title>Bridge with BEN</title>
+    <title>Bridge with BEN</title>
 
-  <link rel="stylesheet" href="style.css">
-  <script src="bridge.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <script src="bridge.js"></script>
 
     <!-- Include jQuery and jQuery UI -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
 
-<script>
-  $(function() {
-    // Initialize the dialog
-    $("#customDialog").dialog({
-      autoOpen: false,
-      modal: true,
-      position: { my: "center", at: "bottom", of: "#bidding" }, // Position relative to the button
-      buttons: {}
-    });
-  })
-</script>
+    <script>
+        $(function () {
+            // Initialize the dialog
+            $("#customDialog").dialog({
+                autoOpen: false,
+                modal: true,
+                position: { my: "center", at: "bottom", of: "#bidding" }, // Position relative to the button
+                buttons: {}
+            });
+        })
+    </script>
 
 </head>
 
 <body>
     <div class="center">
         <h1>Play with BEN. Version 0.8.7.4</h1>
-    </div>    
-<div id="loader"></div> 
-<!-- HTML for the dialog -->
-<div id="customDialog" title="Feedback">
-    <textarea id="commentInput" placeholder="Enter your comments here..."></textarea>
-    <div id="buttonContainer">
-        <button id="nosaveButton">Do not save</button>
-        <button id="badButton">Bad</button>
-        <button id="okButton">OK</button>
-      <button id="goodButton">Good</button>
     </div>
-  </div>
+    <div id="loader"></div>
+    <!-- HTML for the dialog -->
+    <div id="customDialog" title="Feedback">
+        <textarea id="commentInput" placeholder="Enter your comments here..."></textarea>
+        <div id="buttonContainer">
+            <button id="nosaveButton">Do not save</button>
+            <button id="badButton">Bad</button>
+            <button id="okButton">OK</button>
+            <button id="goodButton">Good</button>
+        </div>
+    </div>
 
     <div id="container">
         <div id="north" class="grid-item"></div>
@@ -81,7 +81,7 @@
                     <div class="seat-label">E</div>
                 </div>
                 <div class="table-grid-item trick-south">
-               </div>
+                </div>
                 <div class="table-grid-item label-south">
                     <div class="seat-label">S</div>
                 </div>
@@ -92,7 +92,7 @@
         <div id="bidding" class="grid-item"></div>
     </div>
 
-    <div id="explain" class="explain"></div>        
+    <div id="explain" class="explain"></div>
     <div><a id="homeLink" href="/home">Home</a></div>
 
     <div id="auctionstr"></div>
@@ -142,7 +142,7 @@
         if (visible) player += "&V=x"
         if (matchpoint) player += "&M=x"
         if (play) player += "&play=True"
-        if (playonly) player += "&P=" + playonly 
+        if (playonly) player += "&P=" + playonly
         var queryString = ""
         var ws
         if (dealId) {
@@ -154,16 +154,17 @@
                 queryString = "?" + player
             }
         }
+        // WebSocket client: ws://localhost:4443/?deal=('JT2.K753.QT9.972 AK984.2.AJ84.843 Q65.Q84.7652.JT6 73.AJT96.K3.AKQ5', 'N E-W')&board_no=9&S=x&H=x&A=x&T=2
         try {
             var serverport = '4443'
             var protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
             var port = location.port !== '' ? ':' + location.port : ''; // Extracts the port number, if present
-            console.log("WebSocket client: " + protocol + location.hostname + ":"+  serverport + "/" + queryString)
-            ws = new WebSocket(protocol + location.hostname + ":"+  serverport + "/" + queryString)
+            console.log("WebSocket client: " + protocol + location.hostname + ":" + serverport + "/" + queryString)
+            ws = new WebSocket(protocol + location.hostname + ":" + serverport + "/" + queryString)
 
             ws.addEventListener("error", function (event) {
                 console.log("WebSocket error:", event);
-                alert("Error on server: ", location.hostname + ":"+  serverport,  event )
+                alert("Error on server: ", location.hostname + ":" + serverport, event)
                 document.querySelector('#auctionstr').innerHTML += 'No connection to server <br>'
             });
 
@@ -173,11 +174,11 @@
                 } else {
                     console.error('Connection to server died');
                     alert("Connection died")
-                }                
+                }
                 //document.querySelector('#auctionstr').innerHTML += 'Connection to server closed <br>'
             });
 
-        } catch(error) {
+        } catch (error) {
             console.log("WebSocket error:", error);
             alert("Please start server", error); // Notify the user about the connection failure            
         }
@@ -196,14 +197,14 @@
         // Hide the information
         function hideTrickCardSlots() {
             const trickCardSlots = getTrickCardSlots();
-            trickCardSlots.forEach(el => el.style.visibility  = 'hidden');
+            trickCardSlots.forEach(el => el.style.visibility = 'hidden');
             document.querySelector('#last-trick').style.visibility = 'visible'
         }
 
         // Show the information
         function showTrickCardSlots() {
             const trickCardSlots = getTrickCardSlots();
-            trickCardSlots.forEach(el => el.style.visibility  = 'visible'); // Reset to the default display value
+            trickCardSlots.forEach(el => el.style.visibility = 'visible'); // Reset to the default display value
             document.querySelector('#last-trick').style.visibility = 'hidden'
         }
 
@@ -217,15 +218,15 @@
         function attachAuctionCellClickListeners() {
             const auctionTable = document.querySelector('#auction table')
             if (!auctionTable) return
-            
+
             const tbody = auctionTable.querySelector('tbody')
             if (!tbody) return
-            
+
             const rows = tbody.querySelectorAll('tr')
             rows.forEach((row, rowIndex) => {
                 const cells = row.querySelectorAll('td')
                 cells.forEach((cell, colIndex) => {
-                    cell.addEventListener('click', function() {
+                    cell.addEventListener('click', function () {
                         // Row and column are 1-indexed for user display
                         alert(`Row: ${rowIndex + 1}, Column: ${colIndex + 1}`)
                     })
@@ -259,7 +260,7 @@
                         ws.send(card.symbol)
                         deal.expectCardInput = false
                         return
-                    } 
+                    }
                 }
 
                 console.log(card, "not in hand")
@@ -286,7 +287,7 @@
             for (var i = 0; i < minBiddableSuit; i++) {
                 document.querySelector(bidSuitClasses[i]).classList.add("invalid")
             }
-            
+
         }
 
         function callClick(event) {
@@ -297,7 +298,7 @@
             deal.expectBidInput = (event.target.textContent != "Hint")
             // Start spinner if asking for Hint
             if (!deal.expectBidInput)
-                document.querySelector("#loader").style.visibility = "visible"; 
+                document.querySelector("#loader").style.visibility = "visible";
 
         }
 
@@ -318,7 +319,7 @@
         function claimClick(event) {
             event.stopPropagation();
             let claim = event.target.getAttribute("tricks")
-            console.log("Claimed "+claim+ " tricks")
+            console.log("Claimed " + claim + " tricks")
             ws.send("Claim " + claim)
         }
 
@@ -335,22 +336,22 @@
                 const handElement = document.querySelector(selector);
 
                 // Check if the hand should be visible
-                let shouldBeVisible = (deal.hands[index].isPublic || no_human) && (visible =='x' || deal.turn === index);
+                let shouldBeVisible = (deal.hands[index].isPublic || no_human) && (visible == 'x' || deal.turn === index);
 
                 if (typeof deal.dummy != 'undefined') {
                     // Dummy is always visible
                     if (index == deal.dummy) shouldBeVisible = true
                     // When dummy to play we want to see declarers hand
-                    if ((index + 2) % 4 == deal.dummy && ((index + 2) % 4 == deal.turn || index == deal.turn )) shouldBeVisible = true
+                    if ((index + 2) % 4 == deal.dummy && ((index + 2) % 4 == deal.turn || index == deal.turn)) shouldBeVisible = true
                 }
                 if (shouldBeVisible) {
                     // If the hand was previously hidden, make it visible again
                     //if (deal.hands[index].rendered) {
-                        handElement.style.visibility = 'visible';
+                    handElement.style.visibility = 'visible';
                     //} else {
                     //}
-                        // Call the render method with the direction
-                        deal.hands[index].render(handElement, direction);
+                    // Call the render method with the direction
+                    deal.hands[index].render(handElement, direction);
                 } else {
                     if (deal.hands[index].rendered) {
                         handElement.style.visibility = 'hidden';
@@ -367,7 +368,7 @@
                 const handElement = document.querySelector(selector);
                 if (deal.hands[index].rendered) {
                     handElement.style.visibility = 'visible';
-                } 
+                }
                 // Call the render method with the direction
                 deal.hands[index].render(handElement, direction);
             });
@@ -379,11 +380,11 @@
                 hideTrickCardSlots();
                 ws.send('y')
                 if (timeoutId) clearTimeout(timeoutId);
-                document.querySelector("#loader").style.visibility = "visible"; 
+                document.querySelector("#loader").style.visibility = "visible";
             }
         }
 
-        document.querySelector('body').addEventListener('click', function() {
+        document.querySelector('body').addEventListener('click', function () {
             sendConfirmTrick()
         })
 
@@ -431,7 +432,7 @@
                 deal.auction = data.auction
                 deal.renderAuction(document.querySelector('#auction-container'))
                 attachAuctionCellClickListeners()
-                explain.innerHTML += data.auction[data.auction.length - 1] +"=" + data.explanation + "<br>"
+                explain.innerHTML += data.auction[data.auction.length - 1] + "=" + data.explanation + "<br>"
 
                 deal.turn = (deal.turn + 1) % 4
                 setTurn(deal.turn)
@@ -450,14 +451,14 @@
                     el.addEventListener("click", biddingLevelClick))
                 document.querySelectorAll('#bidding-suits div').forEach(el =>
                     el.addEventListener("click", bidSuitClick))
-                } else if (data.message == "hint") {
+            } else if (data.message == "hint") {
                 console.log(data)
                 let msg = "BEN suggest: " + data.bids.bid + "\n"
                 msg += data.bids.explanation + "\n"
                 msg += "BEN considered: \n"
                 for (const element of data.bids.candidates) {
                     msg += " " + element.call + " Score: "
-                    msg += element.insta_score+ "\n"
+                    msg += element.insta_score + "\n"
                 }
                 alert(msg)
             } else if (data.message == "alert") {
@@ -484,7 +485,7 @@
                 document.querySelectorAll('.card')
                     .forEach(c => c.addEventListener('click', cardClick))
 
-                document.querySelector("#loader").style.visibility = "visible"; 
+                document.querySelector("#loader").style.visibility = "visible";
 
             } else if (data.message == "show_dummy") {
 
@@ -497,7 +498,7 @@
                     .forEach(c => c.addEventListener('click', cardClick))
             } else if (data.message == "card_played") {
                 let card = new Card(data.card)
-                
+
                 deal.currentTrick.cards.push(card)
                 document.querySelector('#last-trick').style.visibility = 'hidden'
                 resetClaim()
@@ -514,13 +515,13 @@
                         deal.hands[data.player] = deal.hands[data.player].play(card)
                         if (deal.dummy == 0) {
                             deal.hands[data.player].render(document.querySelector('#north'), 'north')
-                        } 
+                        }
                         if (deal.dummy == 1) {
                             deal.hands[data.player].render(document.querySelector('#east'), 'east')
-                        } 
+                        }
                         if (deal.dummy == 2) {
                             deal.hands[data.player].render(document.querySelector('#south'), 'south')
-                        } 
+                        }
                         if (deal.dummy == 3) {
                             deal.hands[data.player].render(document.querySelector('#west'), 'west')
                         }
@@ -530,29 +531,29 @@
                             deal.hands[data.player] = deal.hands[data.player].play(card)
                             if (data.player == 0 && north) {
                                 deal.hands[data.player].render(document.querySelector('#north'), 'north')
-                            } 
+                            }
                             if (data.player == 1 && east) {
                                 deal.hands[data.player].render(document.querySelector('#east'), 'east')
-                            } 
+                            }
                             if (data.player == 2 && south) {
                                 deal.hands[data.player].render(document.querySelector('#south'), 'south')
-                            } 
+                            }
                             if (data.player == 3 && west) {
                                 deal.hands[data.player].render(document.querySelector('#west'), 'west')
-                            } 
+                            }
                             // Finally we need to update declarer if we are dummy
                             if (data.player == 0 && deal.declarer == data.player && south) {
                                 deal.hands[data.player].render(document.querySelector('#north'), 'north')
-                            } 
+                            }
                             if (data.player == 1 && deal.declarer == data.player && west) {
                                 deal.hands[data.player].render(document.querySelector('#east'), 'east')
-                            } 
+                            }
                             if (data.player == 2 && deal.declarer == data.player && north) {
                                 deal.hands[data.player].render(document.querySelector('#south'), 'south')
-                            } 
+                            }
                             if (data.player == 3 && deal.declarer == data.player && east) {
                                 deal.hands[data.player].render(document.querySelector('#west'), 'west')
-                            } 
+                            }
                         }
                     }
                 }
@@ -561,7 +562,7 @@
                 deal.currentTrick.render(getTrickCardSlots())
                 deal.turn = (data.player + 1) % 4
                 setTurn(deal.turn)
-                document.querySelector("#loader").style.visibility = "visible"; 
+                document.querySelector("#loader").style.visibility = "visible";
             } else if (data.message == "get_card_input") {
                 // Only claim when waiting for input and player on lead and after first trick
                 if (deal.currentTrick.cards.length == 0 && deal.tricks.length > 0) {
@@ -575,7 +576,7 @@
                     .forEach(c => c.addEventListener('click', cardClick))
                 deal.expectCardInput = true
             } else if (data.message == "claim_rejected") {
-                alert ("Claim rejected")
+                alert("Claim rejected")
                 deal.expectCardInput = true
             } else if (data.message == "trick_confirm") {
                 let trickWinner = deal.currentTrick.winner(deal.strain)
@@ -593,9 +594,9 @@
                 deal.expectTrickConfirm = true
                 if (autocomplete) {
                     // After xx seconds, set expectTrickConfirm to false
-                    timeoutId = setTimeout(function() {
+                    timeoutId = setTimeout(function () {
                         sendConfirmTrick()
-                    }, timeout * 1000); 
+                    }, timeout * 1000);
                 }
             } else if (data.message == "deal_end") {
                 setTurn(-1)
@@ -608,32 +609,32 @@
                 if (data.dict.claimed) {
                     let trickWinner = deal.turn % 2
                     deal.tricksCount[trickWinner] += data.dict.claimed
-                    deal.tricksCount[(trickWinner+1) % 2] = 13 - deal.tricksCount[trickWinner]
+                    deal.tricksCount[(trickWinner + 1) % 2] = 13 - deal.tricksCount[trickWinner]
                     deal.renderTricks(document.querySelector('.tricks'))
-                    alert ("Claim accepted")
+                    alert("Claim accepted")
                 }
                 document.querySelector('#last-trick').style.visibility = 'hidden'
                 resetClaim()
                 $("#customDialog").dialog("open");
                 // Handle button clicks
-                $("#badButton").on("click", function() {
+                $("#badButton").on("click", function () {
                     var userFeedback = $("#commentInput").val();
                     saveDeal(data.dict, userFeedback, "bad");
-                    $("#customDialog").dialog("close");                    
+                    $("#customDialog").dialog("close");
                 });
 
-                $("#okButton").on("click", function() {
+                $("#okButton").on("click", function () {
                     var userFeedback = $("#commentInput").val();
                     saveDeal(data.dict, userFeedback, "ok");
                     $("#customDialog").dialog("close");
                 });
 
-                $("#goodButton").on("click", function() {
+                $("#goodButton").on("click", function () {
                     var userFeedback = $("#commentInput").val();
                     saveDeal(data.dict, userFeedback, "good");
                     $("#customDialog").dialog("close");
                 });
-                $("#nosaveButton").on("click", function() {
+                $("#nosaveButton").on("click", function () {
                     $("#customDialog").dialog("close");
                     navigate();
                 });
@@ -650,7 +651,7 @@
                 }
                 else window.location.href = home;
             }
-            else window.location.href = home;            
+            else window.location.href = home;
         }
 
         function updateQueryParam(param, value) {
@@ -674,7 +675,7 @@
             // Convert the JavaScript object back to a JSON string
             const newDataStr = JSON.stringify(dataObj);
 
-             // Make a POST request
+            // Make a POST request
             fetch('/api/save/deal', {
                 method: 'POST',
                 headers: {
@@ -682,22 +683,22 @@
                 },
                 body: newDataStr,
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                console.log('Deal saved');
-                return response.json();
-            })
-            .then(data => {
-                navigate()
-            })
-            .catch(error => {
-                console.error('There was a problem with the fetch operation:', error);
-            });
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    console.log('Deal saved');
+                    return response.json();
+                })
+                .then(data => {
+                    navigate()
+                })
+                .catch(error => {
+                    console.error('There was a problem with the fetch operation:', error);
+                });
         }
 
-    </script>  
+    </script>
 
-    
+
 </body>

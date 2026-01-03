@@ -29,8 +29,10 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    format='%(asctime)s | %(name)s |  %(message)s',
+    datefmt='%Y-%m-%d'
+    # format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    # datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger('appserver')
 
@@ -138,7 +140,6 @@ def transform_hand(hands):
         hand[i].suit[C_SPADES] = suits[0]
     
     return hand
-
 
 def decode_board(encoded_str_deal):
     # Initialize the hand
@@ -305,10 +306,10 @@ def log_request():
     remote_addr = request.environ.get('REMOTE_ADDR', 'unknown')
     
     # Log request details
-    log_msg = f"API Call - Method: {method}, Path: {path}"
+    log_msg = f"API | {method} : {path}"
     if query_string:
         log_msg += f", Query: {query_string}"
-    log_msg += f", IP: {remote_addr}"
+    # log_msg += f", IP: {remote_addr}"
     
     # For POST requests, log form data (excluding sensitive info)
     if method == 'POST':
@@ -338,7 +339,7 @@ def log_request():
 def log_response():
     """Log response status"""
     status = response.status_code
-    logger.info(f"API Response - Path: {request.path}, Status: {status}")
+    logger.info(f"API Response | {request.path} : {status}")
 
 @app.route('/')
 def index(): 
@@ -464,59 +465,91 @@ def index():
 
 def read_deals():
     deals = []
-    with shelve.open(DB_NAME) as db:
-        deal_items = sorted(list(db.items()), key=lambda x: x[1]['timestamp'], reverse=True)
-        for deal_id, deal in deal_items:
-            board_no_ref = ""
-            board_no_index = ""
-            if 'feedback' in deal: feedback = deal['feedback']
-            else: feedback = ""
-            if 'quality' in deal: quality = deal['quality']
-            else: quality = 'ok'
-            if 'board_number' in deal and deal['board_number'] is not None:
-                board_no_ref = f"&board_number={deal['board_number']}"
-                board_no_index = f"Board:{deal['board_number']}"
-            vulnerable = C_NONE
-            if (deal["vuln_ns"]) and (deal["vuln_ew"]): vulnerable = C_BOTH
-            else:
-                if deal["vuln_ns"]: vulnerable = C_NS
-                if deal["vuln_ew"]: vulnerable = C_WE
-            encoded_str_deal = encode_board(transform_hand(deal["hands"].split(" ")), deal["dealer"], vulnerable, int(deal['board_number']) if deal['board_number'] is not None else 0)                
-            # Trick winners are relative to declarer so 1 and 3 are declarer and dummy
-            tricks = len(list(filter(lambda x: x % 2 == 1, deal['trick_winners'])))
-
-            if 'claimed' in deal:
-                if 'claimedbydeclarer' in deal and deal['claimedbydeclarer']:
-                    tricks += deal['claimed']
-                else:
-                    tricks += 13 - len(deal['trick_winners'])-deal['claimed']
+    try:
+        with shelve.open(DB_NAME, flag='r') as db:
+            # Try to get all items at once first
+            try:
+                deal_items = sorted(list(db.items()), key=lambda x: x[1].get('timestamp', 0), reverse=True)
+            except (SystemError, ValueError, KeyError) as e:
+                # Database might be corrupted, try reading keys one by one
+                logger.warning(f"Database corruption detected, attempting recovery: {e}")
+                deal_items = []
+                try:
+                    # Try to read each key individually
+                    for key in list(db.keys()):
+                        try:
+                            deal = db[key]
+                            if isinstance(deal, dict) and 'timestamp' in deal:
+                                deal_items.append((key, deal))
+                        except (SystemError, ValueError, KeyError) as key_error:
+                            logger.warning(f"Skipping corrupted deal {key}: {key_error}")
+                            continue
+                    # Sort the recovered items
+                    deal_items = sorted(deal_items, key=lambda x: x[1].get('timestamp', 0), reverse=True)
+                except Exception as recovery_error:
+                    logger.error(f"Failed to recover deals from database: {recovery_error}")
+                    return deals  # Return empty list if recovery fails
             
-            if "bidding_only" in deal and deal["bidding_only"]:
-                tricks = ""
+            for deal_id, deal in deal_items:
+                board_no_ref = ""
+                board_no_index = ""
+                if 'feedback' in deal: feedback = deal['feedback']
+                else: feedback = ""
+                if 'quality' in deal: quality = deal['quality']
+                else: quality = 'ok'
+                if 'board_number' in deal and deal['board_number'] is not None:
+                    board_no_ref = f"&board_number={deal['board_number']}"
+                    board_no_index = f"Board:{deal['board_number']}"
+                vulnerable = C_NONE
+                if (deal["vuln_ns"]) and (deal["vuln_ew"]): vulnerable = C_BOTH
+                else:
+                    if deal["vuln_ns"]: vulnerable = C_NS
+                    if deal["vuln_ew"]: vulnerable = C_WE
+                encoded_str_deal = encode_board(transform_hand(deal["hands"].split(" ")), deal["dealer"], vulnerable, int(deal['board_number']) if deal['board_number'] is not None else 0)                
+                # Trick winners are relative to declarer so 1 and 3 are declarer and dummy
+                tricks = len(list(filter(lambda x: x % 2 == 1, deal['trick_winners'])))
 
-            if deal['contract'] is not None:
-                deals.append({
-                    'board_no_index': board_no_index,
-                    'deal_id': deal_id,
-                    'board_no_ref': board_no_ref,
-                    'contract': deal['contract'],
-                    'trick_winners_count': tricks,
-                    'delete_url': f"/api/delete/deal/{deal_id}",
-                    'bba': encoded_str_deal,
-                    'feedback':feedback,
-                    'quality': quality
-                })
-            else:
-                deals.append({
-                    'board_no_index': board_no_index,
-                    'deal_id': deal_id,
-                    'board_no_ref': board_no_ref,
-                    'contract': "All Pass",
-                    'delete_url': f"/api/delete/deal/{deal_id}",
-                    'bba': encoded_str_deal,
-                    'feedback':feedback,
-                    'quality': quality
-                })
+                if 'claimed' in deal:
+                    if 'claimedbydeclarer' in deal and deal['claimedbydeclarer']:
+                        tricks += deal['claimed']
+                    else:
+                        tricks += 13 - len(deal['trick_winners'])-deal['claimed']
+                
+                if "bidding_only" in deal and deal["bidding_only"]:
+                    tricks = ""
+
+                if deal['contract'] is not None:
+                    deals.append({
+                        'board_no_index': board_no_index,
+                        'deal_id': deal_id,
+                        'board_no_ref': board_no_ref,
+                        'contract': deal['contract'],
+                        'trick_winners_count': tricks,
+                        'delete_url': f"/api/delete/deal/{deal_id}",
+                        'bba': encoded_str_deal,
+                        'feedback':feedback,
+                        'quality': quality
+                    })
+                else:
+                    deals.append({
+                        'board_no_index': board_no_index,
+                        'deal_id': deal_id,
+                        'board_no_ref': board_no_ref,
+                        'contract': "All Pass",
+                        'delete_url': f"/api/delete/deal/{deal_id}",
+                        'bba': encoded_str_deal,
+                        'feedback':feedback,
+                        'quality': quality
+                    })
+    except (SystemError, ValueError, OSError, KeyError) as e:
+        logger.error(f"Error reading deals from database {DB_NAME}: {e}")
+        logger.error("Database may be corrupted. Consider backing up and recreating the database.")
+        # Return empty list to allow the page to load
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error reading deals: {e}", exc_info=True)
+        return []
+    
     return deals
 
 @app.route('/home')

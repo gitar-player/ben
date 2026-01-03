@@ -11,6 +11,9 @@ Click on play, choose a pbn file from ben/Boards/BBA
 
 Retrieve hands from: https://www.bridgebase.com/myhands/
 
+a@g.c D@f1
+https://discord.com/channels/1212345698453037056/1212345698453037059 - discord server for ben
+
 # Bridge Engine
 
 This is a game engine for [bridge](https://en.wikipedia.org/wiki/Contract_bridge).

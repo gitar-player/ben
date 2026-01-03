@@ -445,18 +445,21 @@ button:active,
 /* Bidding Suits */
 #bidding-suits {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: var(--spacing-md);
+    justify-content: center;
+    gap: var(--spacing-sm);
+    width: 100%;
 }
 
 #bidding-suits div {
-    margin: var(--spacing-md);
+    margin: 0;
     padding: var(--spacing-sm);
-    width: 3rem;
+    width: 2.5rem;
     height: var(--button-height);
     font-size: 1.8rem;
     font-weight: var(--font-weight-bold);
+    flex-shrink: 0;
 }
 
 /* Bidding Calls */
@@ -490,10 +493,10 @@ button:active,
 #bidding-calls div {
     margin: 0;
     padding: var(--spacing-xs) var(--spacing-sm);
-    width: 5rem;
-    min-width: 5rem;
+    width: 4rem;
+    min-width: 4rem;
     height: var(--button-height);
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     font-weight: var(--font-weight-normal);
     flex-shrink: 0;
 }

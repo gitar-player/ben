@@ -3,7 +3,11 @@ Open terminal at ben folder
 cd src
 conda activate TF2
 python3 gameserver.py
+
+python3 gameapi.py
+
 In another terminal:
+cd frontend
 python3 appserver.py
 
 Then open up localhost:8080 in your usual browsert

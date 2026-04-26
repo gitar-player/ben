@@ -227,8 +227,9 @@
                 const cells = row.querySelectorAll('td')
                 cells.forEach((cell, colIndex) => {
                     cell.addEventListener('click', function () {
-                        // Row and column are 1-indexed for user display
-                        alert(`Row: ${rowIndex + 1}, Column: ${colIndex + 1}`)
+                        let auction_str = deal.auction[rowIndex*3+colIndex]
+                        console.log(auction_str)
+                        // alert(`Row: ${rowIndex}, Column: ${colIndex}, Auction: ${auction_str}`)
                     })
                 })
             })

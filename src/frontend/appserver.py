@@ -191,7 +191,7 @@ def parse_lin(lin):
     hd_west = re.search(rx_hand, lin_hands[1].upper()).groupdict()
     hd_north = re.search(rx_hand, lin_hands[2].upper()).groupdict()
 
-    if len(lin_hands) == 4:
+    if (len(lin_hands) == 4) and (len(lin_hands[3]) > 0):
         hd_east = re.search(rx_hand, lin_hands[3].upper()).groupdict()
     else:
         def seen_cards(suit):
@@ -200,7 +200,15 @@ def parse_lin(lin):
         hd_east = {suit: set('AKQJT98765432') - seen_cards(suit) for suit in 'SHDC'}
 
     def to_pbn(hd):
-        return '.'.join([''.join(list(hd[suit])) for suit in 'SHDC'])
+        # Sort cards within each suit by rank (A, K, Q, J, T, 9, 8, 7, 6, 5, 4, 3, 2)
+        card_order = 'AKQJT98765432'
+        sorted_suits = []
+        for suit in 'SHDC':
+            cards = list(hd[suit])
+            # Sort cards according to card_order (high to low)
+            sorted_cards = sorted(cards, key=lambda c: card_order.index(c) if c in card_order else len(card_order))
+            sorted_suits.append(''.join(sorted_cards))
+        return '.'.join(sorted_suits)
 
     hands = [to_pbn(hd) for hd in [hd_north, hd_east, hd_south, hd_west]]
     # Pattern to find "Board <number>" and extract the number

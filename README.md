@@ -1,5 +1,5 @@
-# Allwyn's notes
-Open terminal at ben folder
+
+##Open terminal at ben folder
 cd src
 conda activate TF2
 python3 gameserver.py
@@ -15,7 +15,7 @@ Click on play, choose a pbn file from ben/Boards/BBA
 
 Retrieve hands from: https://www.bridgebase.com/myhands/
 
-a@g.c D@f1
+a@g.c Discord@f1
 https://discord.com/channels/1212345698453037056/1212345698453037059 - discord server for ben
 
 # Bridge Engine

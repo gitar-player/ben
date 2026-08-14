@@ -30,9 +30,7 @@ else:
 print(f"SuitCLib: {suitclib}")
 print(sys.platform)
 
-# SuitCLib_PATH = os.path.join(BIN_FOLDER, suitclib)
-SuitCLib_PATH = '/Users/allwynsequeira/AllwynDev/ben/bin/libsuitc.so'
-
+SuitCLib_PATH = os.path.join(BIN_FOLDER, suitclib)
 
 import ctypes
 from ctypes import c_wchar_p, c_int, POINTER, create_unicode_buffer, byref, cast, addressof

@@ -125,3 +125,6 @@ Practice
 .venv
 uv.lock
 .python-version
+# Vendored python-dds copy - unused by src/ (which uses src/ddsolver) and
+# contains machine-specific library paths. Kept locally, out of the repo.
+python-dds-master/

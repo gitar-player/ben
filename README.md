@@ -60,6 +60,43 @@ The engine has a (very basic) UI which enables you to play as a human agains thr
 
 The app runs in the browser, and the service has two components: (1) "appserver" which serves the UI through http, and (2) "gameserver" which serves the API to interface with the bots through websockets.
 
+#### Quick start (macOS / Linux)
+
+`start_ben.sh` starts both components, waits until they are actually listening, and opens the browser:
+
+```bash
+./start_ben.sh                          # random boards
+./start_ben.sh --boards Boards/x.pbn    # deal from a file
+./start_ben.sh --force                  # restart if it is already running
+```
+
+Ctrl-C stops both servers. Output goes to `logs/gameserver.log` and `logs/appserver.log`.
+Any option other than `--force` / `--no-browser` is passed through to `gameserver.py`.
+
+The script uses `~/anaconda3/envs/TF2/bin/python` by default, so no `conda activate` is needed.
+Point `BEN_PYTHON` at another interpreter to override it, and `BEN_APP_PORT` / `BEN_WS_PORT` at
+other ports (note that the UI expects the gameserver on 4443, see `bridge.html`).
+
+#### Starting it automatically at login (macOS)
+
+`~/Library/LaunchAgents/com.ben.app.plist` runs the same script at login and restarts it if it
+dies. The file is machine specific (it holds absolute paths), so it is not part of the repo.
+
+```bash
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ben.app.plist   # enable
+launchctl kickstart -k gui/$(id -u)/com.ben.app                            # restart
+launchctl bootout gui/$(id -u)/com.ben.app                                 # disable
+```
+
+Startup output goes to `logs/launchd.log`.
+
+While the agent is loaded it owns ports 8080 and 4443, so a manual `./start_ben.sh` will stop
+at the "already in use" guard. Don't use `--force` to get around it — the agent will just
+restart its own copy 30s later and the two will fight over the ports. Run `launchctl bootout`
+first if you want to start the servers by hand with different options.
+
+#### Starting the components by hand
+
 Following are instructions to start the service:
 
 First, make sure that you are located in the `src` directory

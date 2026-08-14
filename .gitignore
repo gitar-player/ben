@@ -100,6 +100,7 @@ Boards/*.ben
 Boards/*.pbn
 scripts/training/bidding/Old versions/
 src/logs/
+logs/
 scripts/training/data/hands_data.pkl
 src/test.py
 BBA/Boards

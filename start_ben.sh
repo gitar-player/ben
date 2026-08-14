@@ -44,6 +44,16 @@ APP_PORT="${BEN_APP_PORT:-8080}"
 WS_PORT="${BEN_WS_PORT:-4443}"
 LOG_DIR="$ROOT/logs"
 
+# PIMC's engine (BGADLL) is a NativeAOT .NET library whose [DllImport("dds")]
+# is resolved by dlopen, and dlopen does not search the assembly's own
+# directory on macOS. Without this the DDS backend reports "Unable to load
+# shared library 'dds'" at startup and the server dies with SIGABRT partway
+# through the first trick. dyld only reads this at process start, so it has to
+# be exported here rather than set from inside Python.
+if [[ "$(uname -s)" == "Darwin" && -d "$ROOT/bin/BGA/macos/arm64" ]]; then
+    export DYLD_LIBRARY_PATH="$ROOT/bin/BGA/macos/arm64${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+fi
+
 OPEN_BROWSER=1
 FORCE=0
 GAMESERVER_ARGS=()

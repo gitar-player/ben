@@ -11,6 +11,10 @@ websockets>=15.0.1
 
 keras>=3.5.0,<3.6.0
 tensorflow==2.18.1
+# TensorFlow itself allows protobuf up to 6.0, but protobuf 5.0 removed
+# MessageFactory.GetPrototype, which TF's own code still calls - that surfaces as
+# an AttributeError/warning storm at import. Cap it below 5.0.
+protobuf<5.0,>=3.20.3
 grpcio-tools
 
 onnxruntime

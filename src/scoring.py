@@ -1,7 +1,61 @@
 import functools
 import numpy as np
+import math
 
 TRICK_VAL = {'C': 20, 'D': 20, 'H': 30, 'S': 30, 'N': 30}
+
+# Standard ACBL IMP Scale (Difference: IMPs)
+IMP_SCALE = [
+    (10, 0), (40, 1), (80, 2), (120, 3), (160, 4), (210, 5), (260, 6),
+    (310, 7), (360, 8), (420, 9), (490, 10), (590, 11), (740, 12),
+    (890, 13), (1090, 14), (1290, 15), (1490, 16), (1740, 17),
+    (1990, 18), (2240, 19), (2490, 20), (2990, 21), (3490, 22),
+    (3990, 23), (float('inf'), 24)
+]
+
+def calculate_imp(score_diff):
+    """Converts point difference to IMPs based on the scale."""
+    abs_diff = abs(score_diff)
+    for limit, imps in IMP_SCALE:
+        if abs_diff <= limit:
+            return imps if score_diff >= 0 else -imps
+    return 24 if score_diff >= 0 else -24
+
+def calculate_bridge_scores(scores):
+    """
+    Calculates MP and Cross-IMP scores for a list of scores on one board.
+    Input: list of integers (N-S scores).
+    """
+    n = len(scores)
+    results = []
+
+    for i in range(n):
+        my_score = scores[i]
+        
+        # Calculate Matchpoints (MP)
+        # 2 pts for every lower score, 1 pt for every tie
+        mp = sum(2 if my_score > s else 1 if my_score == s else 0 for j, s in enumerate(scores) if i != j)
+        
+        # Calculate Cross-IMPs
+        # Compare my score to every other table and average the resulting IMPs
+        total_imps = sum(calculate_imp(my_score - s) for j, s in enumerate(scores) if i != j)
+        avg_imp = total_imps / (n - 1) if n > 1 else 0
+        
+        results.append({
+            "Score": my_score,
+            "MP": mp,
+            "IMP": round(avg_imp, 2)
+        })
+    
+    return results
+
+# Example: Scores from 4 tables on a single board (N-S perspective)
+board_scores = [420, 420, 170, -50]
+final_scores = calculate_bridge_scores(board_scores)
+
+print(f"{'Score':>10} | {'MP':>5} | {'Cross-IMP':>10}")
+for res in final_scores:
+    print(f"{res['Score']:10} | {res['MP']:5} | {res['IMP']:10}")
 
 def score(contract, is_vulnerable, n_tricks):
     if contract.lower() == "pass":

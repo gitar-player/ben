@@ -9,6 +9,8 @@ from typing import NamedTuple, List
 
 from binary import get_cards_from_binary_hand, get_binary_hand_from_cards32, get_binary_hand_from_cards
 
+from urllib.parse import unquote
+
 symbols = 'AKQJT98765432'
 
 def save_for_training(deal, auction):
@@ -188,7 +190,13 @@ class Board(NamedTuple):
     auction: List[str]
     play: List[str]
 
-def parse_lin(lin):
+def parse_lin(url):
+    lin=''
+    if '?' in url:
+        url = url.split('?')[1]
+
+    url = unquote(url)
+
     rx_bid = r'mb\|([0-9a-zA-Z]+?)!?\|'
     rx_card = r'pc\|([C,D,H,S,c,d,h,s][2-9A,K,Q,J,T])\|'
     rx_hand = r'S(?P<S>[2-9A,K,Q,J,T]*?)H(?P<H>[2-9A,K,Q,J,T]*?)D(?P<D>[2-9A,K,Q,J,T]*?)C(?P<C>[2-9A,K,Q,J,T]*?)$'

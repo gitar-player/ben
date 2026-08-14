@@ -19,10 +19,7 @@ class Card {
             card.classList.add('red')
         }
         if (this.suit == 2) {
-            card.classList.add('orange')
-        }
-        if (this.suit == 3) {
-            card.classList.add('green')
+            card.classList.add('red')
         }
 
         element.appendChild(card)
@@ -328,8 +325,8 @@ class Deal {
         html += '</div>'
 
         html += '<div id="bidding-suits" class="hidden">'
-        html += '<div class="bid-clubs green" symbol="C">&clubs;</div>'
-        html += '<div class="bid-diamonds orange" symbol="D">&diams;</div>'
+        html += '<div class="bid-clubs" symbol="C">&clubs;</div>'
+        html += '<div class="bid-diamonds red" symbol="D">&diams;</div>'
         html += '<div class="bid-hearts red" symbol="H">&hearts;</div>'
         html += '<div class="bid-spades" symbol="S">&spades;</div>'
         html += '<div class="bid-nt" symbol="N">NT</div>'
@@ -486,8 +483,8 @@ class Auction {
             'N': 'NT',
             'S': '<span>&spades;</span>',
             'H': '<span class="red">&hearts;</span>',
-            'D': '<span class="orange">&diams;</span>',
-            'C': '<span class="green">&clubs;</span>'
+            'D': '<span class="red">&diams;</span>',
+            'C': '<span>&clubs;</span>'
         }
 
         return level + symbolFormat[symbol]

@@ -206,6 +206,24 @@
             document.querySelector('#last-trick').style.visibility = 'hidden'
         }
 
+        function attachAuctionCellClickListeners() {
+            const auctionTable = document.querySelector('#auction table')
+            if (!auctionTable) return
+            const tbody = auctionTable.querySelector('tbody')
+            if (!tbody) return
+            const rows = tbody.querySelectorAll('tr')
+            rows.forEach((row, rowIndex) => {
+                const cells = row.querySelectorAll('td')
+                cells.forEach((cell, colIndex) => {
+                    cell.addEventListener('click', function () {
+                        let auction_str = deal.auction[rowIndex * 3 + colIndex]
+                        console.log(auction_str)
+                        // alert(`Row: ${rowIndex}, Column: ${colIndex}, Auction: ${auction_str}`)
+                    })
+                })
+            })
+        }
+
         function setTurn(playerTurn) {
             let labels = ['.label-north', '.label-east', '.label-south', '.label-west']
             labels.forEach(l => document.querySelector(l + ' .seat-label').classList.remove("turn"))
@@ -404,6 +422,7 @@
 
                 updateTable(deal)
                 deal.renderAuction(document.querySelector('#auction-container'))
+                attachAuctionCellClickListeners()
                 deal.renderBiddingBox(document.querySelector('#bidding'))
                 document.querySelectorAll('#last-trick')
                     .forEach(c => c.addEventListener('click', showlasttrick))
@@ -415,6 +434,7 @@
             } else if (data.message == "bid_made") {
                 deal.auction = data.auction
                 deal.renderAuction(document.querySelector('#auction-container'))
+                attachAuctionCellClickListeners()
                 explain.innerHTML += data.auction[data.auction.length - 1] +"=" + data.explanation + "<br>"
 
                 deal.turn = (deal.turn + 1) % 4
@@ -463,6 +483,7 @@
 
                 document.querySelector('#bidding').textContent = ''
                 deal.renderAuction(document.querySelector('#auction-container'))
+                attachAuctionCellClickListeners()
 
                 document.querySelectorAll('.card')
                     .forEach(c => c.addEventListener('click', cardClick))

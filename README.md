@@ -300,8 +300,8 @@ the local fixes below came from. Expect more of these.
 
 ### Local changes not in upstream
 
-Worth sending as pull requests; the three bug fixes affect every platform where BBA is enabled,
-not just macOS.
+The three bug fixes affect every platform where BBA is enabled, not just macOS, and were sent
+upstream on 2026-08-14 - see "Upstream PRs in flight" below.
 
 - `start_ben.sh` and its launchd plist - not upstream at all. Upstream's `src/runservers.sh`
   launches eight processes for a multi-instance deployment; this is a single-instance dev
@@ -319,6 +319,45 @@ not just macOS.
 Tracebacks from the websocket handler are swallowed: `gameserver.py` sets the `websockets.server`
 logger to `CRITICAL`. To debug a 1011, copy `gameserver.py`, change that line to `DEBUG`, and run
 the copy on a spare port.
+
+### Upstream PRs in flight
+
+> **TODO** - opened 2026-08-14 against `lorserker/ben`, all four still open and waiting on the
+> maintainer. Check back; act on whatever he says using the table below. Nothing here breaks if
+> it stays open indefinitely - the fixes are already in `port-to-0.8.8.4`.
+
+| | Branch | What |
+| --- | --- | --- |
+| [PR #184](https://github.com/lorserker/ben/pull/184) | `fix/hint-keyerror` | `KeyError: 'Hint'` closes the connection with a 1011 |
+| [PR #185](https://github.com/lorserker/ben/pull/185) | `fix/disconnect-spin` | Disconnect spins the server at 100% CPU, locking everyone out |
+| [PR #186](https://github.com/lorserker/ben/pull/186) | `fix/server-dropdown-default` | Dropdown defaults to a port nothing listens on |
+| [Issue #187](https://github.com/lorserker/ben/issues/187) | - | PIMC's DDS backend can't load on macOS; asks him to pick one of three fixes |
+
+Check status:
+
+```bash
+gh pr list --repo lorserker/ben --author gitar-player --state all
+gh issue view 187 --repo lorserker/ben --comments
+gh pr view 184 --repo lorserker/ben --json body --jq .body   # the writeups live on GitHub now
+```
+
+| He | You |
+| --- | --- |
+| merges one | `git fetch upstream`, rebase `port-to-0.8.8.4` onto `upstream/main`; the local copy of that commit drops out |
+| requests changes | edit the `fix/*` branch, `git commit --amend`, `git push --force-with-lease` - the PR updates itself |
+| answers #187 | new work: option 1 is a launcher/Dockerfile change, 2 needs a BGADLL rebuild, 3 changes load order |
+| goes quiet | nothing to do; this fork keeps working |
+
+Gotchas when you pick this back up:
+
+- #184 and #185 both touch `src/human.py`, so whichever merges second needs a rebase. Different
+  methods, so it resolves trivially.
+- After any rebase or branch switch, `launchctl kickstart -k gui/$(id -u)/com.ben.app`, since the
+  agent serves whatever is checked out.
+- Don't delete the `fix/*` branches on the fork while the PRs are open - that closes them.
+- Not yet offered upstream: `start_ben.sh` itself (overlaps his `runservers.sh`/`stopservers.sh`,
+  so it is a design conversation rather than a bug fix) and the `.gitignore` entry for the
+  generated dds symlinks (cosmetic; commit `36eb8ab8` if you want it as a fourth PR).
 
 ## Discord
 You are welcome to join our Discord server "BEN the bridge engine" at https://discord.gg/9vaTn2Em 

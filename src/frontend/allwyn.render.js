@@ -243,11 +243,51 @@ function renderSeatLabels(state, dom) {
     });
 }
 
+/**
+ * Append text, turning BBA's suit tokens into pips: "3+!C" -> "3+♣".
+ * Built as nodes rather than markup, so the server's text is never parsed as
+ * HTML.
+ */
+function appendSuitText(parent, text) {
+    // split() with a capture group alternates text, letter, text, letter...
+    String(text).split(/!([CDHS])/).forEach((part, i) => {
+        if (i % 2 === 1) {
+            const index = 'SHDC'.indexOf(part);
+            const pip = document.createElement('span');
+            pip.className = index === 1 || index === 2 ? 'suit red' : 'suit';
+            pip.textContent = SUIT_ENTITIES[index];
+            pip.setAttribute('aria-label', ['spades', 'hearts', 'diamonds', 'clubs'][index]);
+            parent.appendChild(pip);
+        } else if (part) {
+            parent.appendChild(document.createTextNode(part));
+        }
+    });
+}
+
+/** The call a line is about: "1D" -> "1♦", but PASS/X/XX left as words. */
+function appendCall(parent, call) {
+    const bid = /^([1-7])([CDHSN])$/.exec(call ?? '');
+    if (!bid) {
+        parent.appendChild(document.createTextNode(call ?? ''));
+        return;
+    }
+    parent.appendChild(document.createTextNode(bid[1]));
+    if (bid[2] === 'N') {
+        parent.appendChild(document.createTextNode('NT'));
+    } else {
+        appendSuitText(parent, `!${bid[2]}`);
+    }
+}
+
 function renderExplanations(state, dom) {
     clear(dom.explain);
     for (const { call, text } of state.explanations) {
         const line = document.createElement('div');
-        line.textContent = text ? `${call} = ${text}` : call;
+        appendCall(line, call);
+        if (text) {
+            line.appendChild(document.createTextNode(' = '));
+            appendSuitText(line, text);
+        }
         dom.explain.appendChild(line);
     }
 }

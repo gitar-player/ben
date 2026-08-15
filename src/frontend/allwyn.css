@@ -575,6 +575,8 @@ a:hover { text-decoration: underline; }
 #explain:empty { display: none; }
 #explain div { padding: 4px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
 #explain div:last-child { border-bottom: none; }
+#explain .suit { font-size: 1.05em; line-height: 1; }
+#explain .suit.red { color: var(--red); }
 
 /* ------------------------------------------------------------ bidding box */
 

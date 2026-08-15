@@ -94,6 +94,37 @@ The interpreter is resolved in this order: `BEN_PYTHON`, an activated virtualenv
 a conda env named `TF2` or `ben`, then `python3`. `BEN_APP_PORT` / `BEN_WS_PORT` override the
 ports, but note the UI expects the gameserver on 4443 (see the dropdown note below).
 
+#### Choosing the play UI
+
+There are two front ends for the same game. They speak the same websocket protocol and share
+`style.css`, so the choice only changes the markup and the client code:
+
+| `--ui` | Page | |
+| --- | --- | --- |
+| `bridge` (default) | `bridge.html` | The original UI, unmodified. |
+| `allwyn` | `allwyn.html` | Rewrite: ES modules, no jQuery, native `<dialog>`, no CDN. |
+
+```bash
+BEN_UI=allwyn ./start_ben.sh          # or: python appserver.py --ui allwyn
+```
+
+`appserver.py` takes `--ui`, defaulting to `$BEN_UI` and then to `bridge`; `start_ben.sh` passes
+`BEN_UI` through. The setting decides where every "play" link points, so it applies to the home
+page, the deal list and the replay links alike. The banner in `logs/appserver.log` says which one
+is live.
+
+`allwyn.html` splits the ~600 lines that were inline in `bridge.html` into modules with one job
+each - `allwyn.model.js` (bridge rules), `allwyn.protocol.js` (the message contract),
+`allwyn.socket.js` (the wire), `allwyn.state.js` (game state), `allwyn.render.js` (state to DOM).
+Nothing but the renderer touches the DOM, so the game loop can be tested without a browser:
+
+```bash
+node src/frontend/allwyn.test.mjs                       # model, protocol and state checks
+node src/frontend/allwyn.test.mjs recorded-session.json # plus a replay of a real deal
+```
+
+`bridge.html` is deliberately untouched by all of this, so upstream changes to it still merge.
+
 #### Starting it automatically at login (macOS)
 
 `~/Library/LaunchAgents/com.ben.app.plist` runs the same script at login and restarts it if it

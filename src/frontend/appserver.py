@@ -26,6 +26,17 @@ from functools import wraps
 app = Bottle()
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
+# Which page the "play" links point at. "bridge" is the original UI; "allwyn" is
+# the rewritten one (ES modules, no jQuery, native dialogs). Both speak the same
+# websocket protocol and share style.css, so the choice is only about markup and
+# client code. Set with --ui or the BEN_UI environment variable.
+UI_PAGES = {
+    "bridge": "bridge.html",
+    "allwyn": "allwyn.html",
+}
+DEFAULT_UI = "bridge"
+UI_PAGE = UI_PAGES[DEFAULT_UI]
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -419,7 +430,7 @@ def index():
 
         deal = " ".join(deal)
         print(deal)
-        url = f"/app/bridge.html?deal=(%27{deal}%27, %27{dealer} {vulnerable}%27){player}&board_no={board_no}&server={server}" + (f"&play={play}" if play else "")
+        url = f"/app/{UI_PAGE}?deal=(%27{deal}%27, %27{dealer} {vulnerable}%27){player}&board_no={board_no}&server={server}" + (f"&play={play}" if play else "")
     
     dealpbn = request.forms.get('dealpbn')
     if dealpbn:
@@ -427,7 +438,7 @@ def index():
             dealpbn = request.forms.get('dealpbn')
             dealer, vulnerable, deal, board_no = parse_pbn(dealpbn.splitlines())
             print(deal)
-            url = f"/app/bridge.html?deal=(%27{deal}%27, %27{dealer} {vulnerable}%27){player}&board_no={board_no}&server={server}" + (f"&play={play}" if play else "")
+            url = f"/app/{UI_PAGE}?deal=(%27{deal}%27, %27{dealer} {vulnerable}%27){player}&board_no={board_no}&server={server}" + (f"&play={play}" if play else "")
         except Exception as e:
             error_message = f'Error parsing PBN-input. {e}'
             print(error_message)
@@ -440,7 +451,7 @@ def index():
         dealbsol = request.forms.get('dealbsol')
         dealer, vulnerable, deal, board_no = parse_bsol(dealbsol)
         print(deal)
-        url = f"/app/bridge.html?deal=(%27{deal}%27, %27{dealer} {vulnerable}%27){player}&board_no={board_no}&server={server}" + (f"&play={play}" if play else "")
+        url = f"/app/{UI_PAGE}?deal=(%27{deal}%27, %27{dealer} {vulnerable}%27){player}&board_no={board_no}&server={server}" + (f"&play={play}" if play else "")
 
     deallin = request.forms.get('deallin')
     if deallin:
@@ -463,18 +474,18 @@ def index():
 
         deal = " ".join(deal)
         print(deal)
-        url = f"/app/bridge.html?deal=(%27{deal}%27, %27{dealer} {vulnerable}%27){player}&board_no={board_no}&server={server}" + (f"&play={play}" if play else "")
+        url = f"/app/{UI_PAGE}?deal=(%27{deal}%27, %27{dealer} {vulnerable}%27){player}&board_no={board_no}&server={server}" + (f"&play={play}" if play else "")
 
     dealbba = request.forms.get('dealbba')
     if dealbba:
         hand, dealer, vulnerable, board_no = decode_board(dealbba)
         deal_as_str = hand_as_string(hand)
-        url = f"/app/bridge.html?deal=(%27{deal_as_str}%27, %27{dealer} {vulnerable}%27){player}&board_no={board_no}&server={server}" + (f"&play={play}" if play else "")
+        url = f"/app/{UI_PAGE}?deal=(%27{deal_as_str}%27, %27{dealer} {vulnerable}%27){player}&board_no={board_no}&server={server}" + (f"&play={play}" if play else "")
     if url:
         redirect(url)
     else:
         board_no = request.forms.get('board')
-        redirect(f"/app/bridge.html?board_no={board_no}{player}&server={server}" + (f"&play={play}" if play else ""))
+        redirect(f"/app/{UI_PAGE}?board_no={board_no}{player}&server={server}" + (f"&play={play}" if play else ""))
 
 def read_deals():
     deals = []
@@ -684,11 +695,16 @@ if __name__ == "__main__":
     parser.add_argument("--host", default="localhost", help="Hostname for appserver")
     parser.add_argument("--port", type=int, default=8080, help="Port for appserver")
     parser.add_argument("--db", default=DB_NAME, help="Db for appserver")
+    parser.add_argument("--ui", default=os.environ.get("BEN_UI", DEFAULT_UI), choices=sorted(UI_PAGES),
+                        help="Which play UI to serve links to (default: %(default)s, or set BEN_UI)")
 
     args = parser.parse_args()
 
     DB_NAME =  args.db
     print("Reading deals from: "+DB_NAME)
+
+    UI_PAGE = UI_PAGES[args.ui]
+    print(f"Play UI: {args.ui} ({UI_PAGE})", flush=True)
 
     host = args.host
     port = args.port

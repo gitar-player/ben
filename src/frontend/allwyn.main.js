@@ -1,0 +1,265 @@
+/**
+ * Wiring: socket -> state -> render, and user input -> socket.
+ *
+ * Everything specific to this page lives here. The modules it pulls in have no
+ * knowledge of each other's concerns: the model knows bridge rules, the state
+ * knows the game, the renderer knows the DOM, the socket knows the wire.
+ */
+
+import { Card } from './allwyn.model.js';
+import { OUTBOUND, readOptions, buildQueryString } from './allwyn.protocol.js';
+import { GameSocket, gameServerUrl } from './allwyn.socket.js';
+import { GameState } from './allwyn.state.js';
+import { collectDom, render, renderClaimOptions } from './allwyn.render.js';
+
+const options = readOptions();
+const dom = collectDom();
+const state = new GameState(options);
+
+let trickTimer = null;
+
+const socket = new GameSocket(
+    gameServerUrl(options, buildQueryString(options)),
+    {
+        onMessage: (message) => handle(message),
+        onStatus: (status, detail) => state.setConnection(status, detail),
+    },
+);
+
+state.subscribe(() => render(state, dom));
+
+function handle(message) {
+    for (const effect of state.apply(message)) {
+        switch (effect.type) {
+            case 'hint':
+                showHint(effect.bids);
+                break;
+            case 'alert-toggled':
+                showNotice(effect.armed ? 'Your bid will be alerted.' : 'Your bid will NOT be alerted.');
+                break;
+            case 'claim-rejected':
+                showNotice('Claim rejected.');
+                break;
+            case 'claim-accepted':
+                showNotice('Claim accepted.');
+                break;
+            case 'schedule-trick-confirm':
+                clearTimeout(trickTimer);
+                trickTimer = setTimeout(confirmTrick, Math.max(0, effect.seconds) * 1000);
+                break;
+            case 'deal-end':
+                openFeedbackDialog(effect.dict);
+                break;
+        }
+    }
+}
+
+/* ---------------------------------------------------------------- messages */
+
+/**
+ * Transient in-page notice. bridge.html uses alert() here, which freezes the
+ * game loop until the player dismisses it and cannot be closed by the page.
+ */
+function showNotice(text, ms = 4000) {
+    const el = dom.root.querySelector('#notice');
+    if (!el) return;
+    el.textContent = text;
+    el.hidden = false;
+    clearTimeout(showNotice.timer);
+    showNotice.timer = setTimeout(() => { el.hidden = true; }, ms);
+}
+
+function showHint(bids) {
+    const dialog = dom.root.querySelector('#hint-dialog');
+    const body = dom.root.querySelector('#hint-body');
+    if (!dialog || !body) return;
+
+    body.replaceChildren();
+    const suggestion = document.createElement('p');
+    suggestion.innerHTML = '';
+    suggestion.textContent = `BEN suggests: ${bids.bid}`;
+    body.appendChild(suggestion);
+
+    if (bids.explanation) {
+        const explanation = document.createElement('p');
+        explanation.textContent = bids.explanation;
+        body.appendChild(explanation);
+    }
+
+    if (bids.candidates?.length) {
+        const heading = document.createElement('p');
+        heading.textContent = 'BEN considered:';
+        body.appendChild(heading);
+
+        const list = document.createElement('ul');
+        for (const candidate of bids.candidates) {
+            const item = document.createElement('li');
+            item.textContent = `${candidate.call} - score ${candidate.insta_score}`;
+            list.appendChild(item);
+        }
+        body.appendChild(list);
+    }
+    dialog.showModal();
+}
+
+/* ------------------------------------------------------------ user actions */
+
+function send(payload) {
+    return socket.send(payload);
+}
+
+function confirmTrick() {
+    if (!state.expectTrickConfirm) return;
+    state.expectTrickConfirm = false;
+    state.showLastTrick = false;
+    state.busy = true;
+    clearTimeout(trickTimer);
+    if (send(OUTBOUND.confirmTrick())) state.notify();
+}
+
+// Clicking anywhere acknowledges a finished trick, as in bridge.html.
+document.body.addEventListener('click', confirmTrick);
+
+function onCardActivate(event) {
+    const element = event.target.closest('.card');
+    if (!element) return;
+    const card = new Card(element.getAttribute('symbol'));
+    if (!state.canPlay(card)) return;
+    if (send(OUTBOUND.card(card.symbol))) {
+        state.expectCardInput = false;
+        state.busy = true;
+        state.notify();
+    }
+}
+
+// One delegated listener instead of re-binding every card after each render.
+document.body.addEventListener('click', onCardActivate);
+document.body.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+        if (event.target.classList?.contains('card')) {
+            event.preventDefault();
+            onCardActivate(event);
+        }
+    }
+});
+
+/** Bidding box: levels reveal the strains that are still legal. */
+dom.bidding?.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!state.expectBidInput || target.classList.contains('invalid')) return;
+
+    if (target.dataset.level) {
+        const level = Number(target.dataset.level);
+        dom.bidding.querySelectorAll('#bidding-levels div').forEach((el) => el.classList.remove('selected'));
+        dom.bidding.querySelectorAll('#bidding-suits div').forEach((el) => el.classList.remove('invalid'));
+        target.classList.add('selected');
+
+        const minSuit = state.deal.auctionModel.getMinBiddableSuitForLevel(level);
+        const suitElements = ['.bid-clubs', '.bid-diamonds', '.bid-hearts', '.bid-spades', '.bid-nt'];
+        for (let i = 0; i < minSuit; i++) {
+            dom.bidding.querySelector(suitElements[i])?.classList.add('invalid');
+        }
+        return;
+    }
+
+    const symbol = target.getAttribute('symbol');
+    if (symbol) {
+        const selected = dom.bidding.querySelector('#bidding-levels .selected');
+        if (!selected) return;
+        if (send(OUTBOUND.bid(selected.textContent + symbol))) {
+            state.expectBidInput = false;
+            state.busy = true;
+            state.notify();
+        }
+        return;
+    }
+
+    const text = target.textContent?.trim();
+    if (!text) return;
+    if (text === 'Hint') {
+        if (send(OUTBOUND.hint())) { state.busy = true; state.notify(); }
+    } else if (text === 'Alert') {
+        send(OUTBOUND.toggleAlert());
+    } else if (['PASS', 'X', 'XX'].includes(text)) {
+        if (send(OUTBOUND.bid(text))) {
+            state.expectBidInput = false;
+            state.busy = true;
+            state.notify();
+        }
+    }
+});
+
+dom.lastTrick?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    state.showLastTrick = true;
+    state.notify();
+});
+
+dom.claim?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    renderClaimOptions(state, dom);
+});
+
+dom.claimTricks?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const tricks = event.target.getAttribute('tricks');
+    if (tricks !== null) send(OUTBOUND.claim(tricks));
+});
+
+dom.concede?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    send(OUTBOUND.concede());
+});
+
+/* ------------------------------------------------------- end-of-deal dialog */
+
+function openFeedbackDialog(dict) {
+    const dialog = dom.dialog;
+    if (!dialog) return;
+    dialog.returnValue = '';
+    dialog.showModal();
+
+    dialog.addEventListener('close', () => {
+        const quality = dialog.returnValue;
+        if (!quality || quality === 'nosave') {
+            navigateOn();
+            return;
+        }
+        saveDeal(dict, dom.comment?.value ?? '', quality).finally(navigateOn);
+    }, { once: true });
+}
+
+async function saveDeal(dict, feedback, quality) {
+    try {
+        const response = await fetch('/api/save/deal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...dict, feedback, quality }),
+        });
+        if (!response.ok) throw new Error(`server said ${response.status}`);
+    } catch (error) {
+        console.error('Could not save the deal:', error);
+        showNotice(`Could not save the deal: ${error.message}`);
+    }
+}
+
+function navigateOn() {
+    const home = options.play ? '/play' : '/home';
+    if (!options.continuous) {
+        window.location.href = home;
+        return;
+    }
+    const url = new URL(window.location.href);
+    const boardNo = url.searchParams.get('board_no');
+    if (boardNo) {
+        url.searchParams.set('board_no', String(Number(boardNo) + 1));
+        window.location.href = url.href;
+    } else {
+        window.location.href = home;
+    }
+}
+
+/* ------------------------------------------------------------------- start */
+
+render(state, dom);
+socket.connect();

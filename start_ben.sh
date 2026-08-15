@@ -146,7 +146,9 @@ echo ""
 GAMESERVER_PID=$!
 PIDS+=("$GAMESERVER_PID")
 
-( cd "$ROOT/src/frontend" && exec "$PY" appserver.py --host 127.0.0.1 --port "$APP_PORT" ) \
+# BEN_UI selects the play UI ("bridge" or "allwyn"); appserver defaults it.
+( cd "$ROOT/src/frontend" && exec "$PY" appserver.py --host 127.0.0.1 --port "$APP_PORT" \
+    ${BEN_UI:+--ui "$BEN_UI"} ) \
     > "$LOG_DIR/appserver.log" 2>&1 &
 APPSERVER_PID=$!
 PIDS+=("$APPSERVER_PID")

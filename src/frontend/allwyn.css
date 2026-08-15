@@ -70,7 +70,7 @@
        West keep one width from deal to last trick. */
     --side-hand-w: 13rem;
     --table-h: 21.5rem;
-    --biddingbox-h: 5rem;
+    --biddingbox-h: 7rem;
 }
 
 /*
@@ -583,14 +583,18 @@ a:hover { text-decoration: underline; }
 
 #bidding { padding: 0; background: none; border: none; min-height: var(--biddingbox-h); }
 
+/*
+ * Two columns: levels with the strains beneath them on the left, the calls on
+ * the right with Alert and Hint under PASS/X/XX.
+ */
 #bidding-box {
-    max-width: 660px;
+    width: max-content;
     margin-inline: auto;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    display: grid;
+    grid-template-columns: auto auto;
+    align-items: start;
     justify-content: center;
-    gap: var(--space-2);
+    gap: var(--space-2) var(--space-4);
     padding: var(--space-3);
     background: var(--bg-raised);
     border: 1px solid var(--border);
@@ -598,13 +602,21 @@ a:hover { text-decoration: underline; }
     box-shadow: var(--shadow-sm);
 }
 
-#bidding-levels, #bidding-suits, #bidding-calls { display: flex; gap: 4px; }
+#bidding-levels, #bidding-suits { display: flex; gap: 4px; }
 
-#bidding-suits::before, #bidding-calls::before {
-    content: "";
-    align-self: stretch;
+#bidding-levels { grid-column: 1; grid-row: 1; }
+#bidding-suits  { grid-column: 1; grid-row: 2; justify-self: start; }
+
+/* Three across, so PASS/X/XX fill the first row and Alert/Hint drop below. */
+#bidding-calls {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: grid;
+    grid-template-columns: repeat(3, auto);
+    gap: 4px;
+    align-content: start;
     border-left: 1px solid var(--border);
-    margin-right: var(--space-2);
+    padding-left: var(--space-4);
 }
 
 #bidding-levels div, #bidding-suits div, #bidding-calls div {

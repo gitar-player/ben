@@ -23,15 +23,19 @@ export function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
 }
 
-/** Wire a button that cycles system -> dark -> light. */
+/** Wire a button that cycles dark -> light -> auto, labelled with the next. */
 export function initTheme(button) {
     let theme = readTheme();
     applyTheme(theme);
 
+    // The button is labelled with what clicking it does, not with the theme you
+    // are already looking at.
     const paint = () => {
         if (!button) return;
-        button.textContent = LABELS[theme];
-        button.setAttribute('aria-label', `Theme: ${LABELS[theme]}. Click to change.`);
+        const next = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length];
+        button.textContent = LABELS[next];
+        button.setAttribute('aria-label', `Switch to ${LABELS[next].toLowerCase()} theme`);
+        button.setAttribute('title', `Currently ${LABELS[theme].toLowerCase()}`);
     };
     paint();
 

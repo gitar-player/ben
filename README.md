@@ -76,7 +76,42 @@ The engine has a (very basic) UI which enables you to play as a human agains thr
 
 The app runs in the browser, and the service has two components: (1) "appserver" which serves the UI through http, and (2) "gameserver" which serves the API to interface with the bots through websockets.
 
-Following are instructions to start the service:
+#### Quick start (macOS / Linux)
+
+`start_ben.sh` starts both components, waits until they are actually listening, and opens the browser:
+
+```bash
+./start_ben.sh                          # random boards
+./start_ben.sh --boards Boards/x.pbn    # deal from a file
+./start_ben.sh --force                  # restart if it is already running
+./start_ben.sh --no-browser             # don't open a browser window
+```
+
+Ctrl-C stops both servers. Output goes to `logs/gameserver.log` and `logs/appserver.log`.
+Any option other than the ones listed is passed through to `gameserver.py`.
+
+The interpreter is resolved in this order: `BEN_PYTHON`, an activated virtualenv, `./.venv`,
+a conda env named `TF2` or `ben`, then `python3`. `BEN_APP_PORT` / `BEN_WS_PORT` override the
+ports, but note the UI expects the gameserver on 4443 (see the dropdown note below).
+
+#### Starting it automatically at login (macOS)
+
+`~/Library/LaunchAgents/com.ben.app.plist` runs the same script at login and restarts it if it
+dies. The file is machine specific (it holds absolute paths), so it is not part of the repo.
+
+```bash
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ben.app.plist   # enable
+launchctl kickstart -k gui/$(id -u)/com.ben.app                            # restart
+launchctl bootout gui/$(id -u)/com.ben.app                                 # disable
+```
+
+Startup output goes to `logs/launchd.log`.
+
+While the agent is loaded it owns ports 8080 and 4443, so a manual `./start_ben.sh` stops at
+the "already in use" guard. Don't use `--force` to get around it - the agent restarts its own
+copy 30s later and the two fight over the ports. Run `launchctl bootout` first.
+
+Following are instructions to start the service by hand:
 
 First, make sure that you are located in the `src` directory
 
@@ -216,6 +251,74 @@ Below is a list of features which aren't implemented in this engine yet, but you
 ```
 ## Using Mac
 On Mac i use python3 and pip3
+
+## Notes on this fork
+
+This is [gitar-player/ben](https://github.com/gitar-player/ben), a fork of
+[lorserker/ben](https://github.com/lorserker/ben). Branches:
+
+| Branch | What it is |
+| --- | --- |
+| `port-to-0.8.8.4` | Working branch. Upstream 0.8.8.4 plus the local changes below. |
+| `allwyn-main` | The old line, based on 0.8.7.4. Kept for reference; superseded. |
+| `main` | Clean mirror of upstream. Don't commit here - `git fetch upstream && git merge upstream/main`. |
+
+`origin` is this fork, `upstream` is lorserker/ben. The push URL on `upstream` is deliberately
+set to a bogus value so a stray `git push upstream` can't target the original repo.
+
+### Things that will bite you again
+
+**The launchd agent follows whatever branch is checked out.** The plist runs `start_ben.sh`
+from the working tree - there is no branch pinning. Check out a different branch and the agent
+silently starts serving that one after its next restart.
+
+**macOS 26.5 or newer is required.** `bin/dds3-darwin/dds3/_dds3.so` (DDS 3.0.0, arrived in
+0.8.8.0) is built against a newer libc++ than earlier releases ship. On macOS 26.3 it fails with
+`Symbol not found: __ZNSt3__113__hash_memoryEPKvm ... built for macOS 26.5`, and the gameserver
+exits at startup. There is no fallback to the old libdds, and no dds3 wheel on PyPI - the only
+alternatives are to update macOS or build it yourself with `bazelisk build -c opt //python:_dds3`.
+
+**PIMC needs `DYLD_LIBRARY_PATH` pointing at `bin/BGA/macos/arm64`.** BGADLL is a NativeAOT .NET
+library whose `[DllImport("dds")]` goes through dlopen, and dlopen doesn't search the assembly's
+own directory on macOS. Without it the banner says `DDS: error: Unable to load shared library
+'dds'` and the server dies with SIGABRT partway through the first trick. `start_ben.sh` exports
+it; **if you run `python gameserver.py` by hand, you have to set it yourself**, because dyld only
+reads it at process start. A healthy start says `PIMC enabled. Version 0.9.9.1 DDS: haglund`.
+
+**The `?server=` dropdown maps to ports 4440-4443.** Options "BEN 2/1", "BEN SAYC" and "GIB-BBO"
+only exist if you started those instances with `src/runservers.sh`; `start_ben.sh` runs one
+gameserver on 4443. The default is set to "Default (21GF)" here, but the dropdown remembers an
+explicit choice in browser localStorage, so if the pre-flight says "No BEN server found on port
+444x", pick "Default (21GF)" once.
+
+**Two runtime-generated symlinks show up as untracked** - `bin/BGA/macos/arm64/dds.dylib` and
+`libdds.dylib`, created by `BGADLL_Native` on first load. Harmless; don't commit them.
+
+**`0.8.8.x` enables BBA, PIMC and SuitC on macOS**, which 0.8.7.4 disabled outright on every
+non-Windows platform. Several code paths therefore run for the first time on Mac, which is where
+the local fixes below came from. Expect more of these.
+
+### Local changes not in upstream
+
+Worth sending as pull requests; the three bug fixes affect every platform where BBA is enabled,
+not just macOS.
+
+- `start_ben.sh` and its launchd plist - not upstream at all. Upstream's `src/runservers.sh`
+  launches eight processes for a multi-instance deployment; this is a single-instance dev
+  launcher with a readiness wait and clean teardown.
+- **Hint crash**: clicking Hint sent the literal string `"Hint"` into the bid explainer, which
+  raised `KeyError: 'Hint'` in BBA and killed the connection with a 1011. Invisible before
+  0.8.8.x because `explain()` returns early when BBA is off, and until the auction has a real
+  bid - so a hint on the first turn worked and a later one didn't.
+- **Runaway loop on disconnect**: the card-input loops only exited when the error text contained
+  `"going away"`, but a normal browser close reports `"received 1000 (OK)"`. The server then
+  pinned a core at 99%, stopped answering new connections, and wrote 3.2M log lines in two
+  minutes. Any player closing a tab mid-trick took the server down for everyone.
+- **Server dropdown default**, as described above.
+
+Tracebacks from the websocket handler are swallowed: `gameserver.py` sets the `websockets.server`
+logger to `CRITICAL`. To debug a 1011, copy `gameserver.py`, change that line to `DEBUG`, and run
+the copy on a spare port.
 
 ## Discord
 You are welcome to join our Discord server "BEN the bridge engine" at https://discord.gg/9vaTn2Em 

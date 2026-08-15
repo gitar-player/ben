@@ -591,6 +591,9 @@ a:hover { text-decoration: underline; }
     pointer-events: none;
 }
 #bidding-suits .red { color: var(--red); }
+/* Dimmed rather than absent before a level is chosen, so the two-step bid is
+   visible. Lighter than .invalid, which means "illegal call". */
+#bidding-suits.awaiting-level div { opacity: 0.45; }
 #bidding-suits div { font-size: 1rem; }
 #bidding-calls .pass { color: var(--green); }
 #bidding-calls .double, #bidding-calls .redouble { color: var(--red); }

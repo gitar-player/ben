@@ -102,11 +102,15 @@ function renderHands(state, dom) {
 }
 
 function renderTrick(state, dom) {
-    const trick = state.deal.currentTrick;
+    // Priority: a finished trick waiting to be acknowledged, then the trick the
+    // player asked to see again, then the one in progress.
+    const trick = state.pendingTrick
+        ?? (state.showLastTrick ? state.deal.tricks[state.deal.tricks.length - 1] : state.deal.currentTrick);
+
     dom.trickSlots.forEach((slot) => {
         if (!slot) return;
         clear(slot);
-        slot.style.visibility = state.showLastTrick ? 'hidden' : 'visible';
+        slot.style.visibility = 'visible';
     });
     if (!trick) return;
     for (let seat = trick.leadPlayer, i = 0; i < trick.cards.length; seat = (seat + 1) % 4, i++) {
@@ -195,11 +199,13 @@ function renderBiddingBox(state, dom) {
     }
     box.appendChild(levels);
 
-    // The strains only appear once a level is chosen, and then only those high
-    // enough to be a legal call over the last bid.
+    // Always on screen, so it is obvious a bid is level-then-strain. Until a
+    // level is picked they are all inactive; after that, only the strains too
+    // low to be a legal call stay greyed out. (bridge.html hides the row
+    // entirely until a level is clicked, which reads as "there are no suit
+    // buttons".)
     const suits = document.createElement('div');
     suits.id = 'bidding-suits';
-    if (state.selectedLevel === null) suits.classList.add('hidden');
     [
         ['bid-clubs', 'C', SUIT_ENTITIES[3], false],
         ['bid-diamonds', 'D', SUIT_ENTITIES[2], true],
@@ -213,12 +219,13 @@ function renderBiddingBox(state, dom) {
         el.textContent = glyph;
         suits.appendChild(el);
     });
-    if (state.selectedLevel !== null) {
-        const minStrain = auction.getMinBiddableSuitForLevel(state.selectedLevel);
-        [...suits.children].forEach((el, i) => {
-            if (i < minStrain) el.classList.add('invalid');
-        });
-    }
+    const minStrain = state.selectedLevel === null
+        ? suits.children.length                                   // nothing selected: all inactive
+        : auction.getMinBiddableSuitForLevel(state.selectedLevel);
+    [...suits.children].forEach((el, i) => {
+        if (i < minStrain) el.classList.add('invalid');
+    });
+    suits.classList.toggle('awaiting-level', state.selectedLevel === null);
     box.appendChild(suits);
 
     const calls = document.createElement('div');

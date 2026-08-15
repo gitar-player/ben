@@ -132,3 +132,14 @@ logs/
 # Vendored python-dds copy - unused by src/ (which uses src/ddsolver) and
 # contains machine-specific library paths. Kept locally, out of the repo.
 python-dds-master/
+
+# Symlinks that src/pimc/BGADLL_Native.py creates at load time so the NativeAOT
+# BGADLL can resolve [DllImport("dds")]. They are generated next to the vendored
+# libdds, and point at it. Listed individually on purpose: bin/libdds.so and
+# bin/darwin/libdds.2.9.0.dylib are real tracked files, and a wider glob would
+# swallow them too.
+bin/BGA/*/*/dds.dylib
+bin/BGA/*/*/libdds.dylib
+bin/BGA/*/*/libdds.so
+bin/darwin/dds.dylib
+bin/darwin/libdds.dylib

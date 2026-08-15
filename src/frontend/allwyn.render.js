@@ -260,7 +260,7 @@ function renderStatus(state, dom) {
 /** Full render pass. Cheap enough at this size to redo on every message. */
 export function render(state, dom) {
     renderStatus(state, dom);
-    if (dom.loader) dom.loader.style.visibility = state.busy ? 'visible' : 'hidden';
+    if (dom.loader) dom.loader.hidden = !state.busy;
     if (!state.deal) return;
 
     if (dom.boardNumber) dom.boardNumber.textContent = state.deal.boardNo ?? '';
@@ -274,9 +274,9 @@ export function render(state, dom) {
     if (dom.tricks) {
         dom.tricks.textContent = `Tricks NS:${state.deal.tricksCount[0]} EW:${state.deal.tricksCount[1]}`;
     }
-    if (dom.lastTrick) dom.lastTrick.style.visibility = state.showLastTrick ? 'visible' : 'hidden';
-    if (dom.claim) dom.claim.style.visibility = state.claimAvailable ? 'visible' : 'hidden';
-    if (dom.concede) dom.concede.style.visibility = state.concedeAvailable ? 'visible' : 'hidden';
+    if (dom.lastTrick) dom.lastTrick.hidden = !state.showLastTrick;
+    if (dom.claim) dom.claim.hidden = !state.claimAvailable;
+    if (dom.concede) dom.concede.hidden = !state.concedeAvailable;
     if (!state.claimAvailable) clear(dom.claimTricks);
 }
 

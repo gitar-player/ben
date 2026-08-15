@@ -11,10 +11,13 @@ import { OUTBOUND, readOptions, buildQueryString } from './allwyn.protocol.js';
 import { GameSocket, gameServerUrl } from './allwyn.socket.js';
 import { GameState } from './allwyn.state.js';
 import { collectDom, render, renderClaimOptions } from './allwyn.render.js';
+import { initTheme } from './allwyn.theme.js';
 
 const options = readOptions();
 const dom = collectDom();
 const state = new GameState(options);
+
+initTheme(document.querySelector('#theme-toggle'));
 
 let trickTimer = null;
 

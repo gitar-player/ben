@@ -115,7 +115,11 @@ is live.
 
 `allwyn.html` splits the ~600 lines that were inline in `bridge.html` into modules with one job
 each - `allwyn.model.js` (bridge rules), `allwyn.protocol.js` (the message contract),
-`allwyn.socket.js` (the wire), `allwyn.state.js` (game state), `allwyn.render.js` (state to DOM).
+`allwyn.socket.js` (the wire), `allwyn.state.js` (game state), `allwyn.render.js` (state to DOM),
+`allwyn.theme.js` (the theme toggle). It has its own stylesheet, `allwyn.css`: dark by default,
+with a Dark / Light / Auto button in the header that remembers the choice in localStorage.
+`style.css` is left to `bridge.html`.
+
 Nothing but the renderer touches the DOM, so the game loop can be tested without a browser:
 
 ```bash

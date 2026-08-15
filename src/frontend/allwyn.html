@@ -5,112 +5,98 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
+    <meta name="color-scheme" content="dark light">
     <title>Bridge with BEN</title>
-    <link rel="stylesheet" href="style.css">
-    <style>
-        /* Only what this page adds on top of the shared stylesheet. */
-        .status {
-            margin: 0 auto 8px;
-            padding: 6px 10px;
-            max-width: 60ch;
-            text-align: center;
-            border-radius: 4px;
-            background: #eee;
-        }
-        .status.error { background: #ffe0e0; color: #900; }
-
-        #notice {
-            position: fixed;
-            top: 12px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 8px 16px;
-            background: #333;
-            color: #fff;
-            border-radius: 4px;
-            z-index: 100;
-        }
-
-        dialog {
-            border: 1px solid #999;
-            border-radius: 6px;
-            padding: 16px;
-            max-width: 46ch;
-        }
-        dialog::backdrop { background: rgb(0 0 0 / 40%); }
-        dialog .buttons { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
-        dialog textarea { width: 100%; min-height: 5em; box-sizing: border-box; }
-
-        /* Keyboard focus needs to be visible now that cards are reachable by tab. */
-        .card:focus-visible { outline: 2px solid #06c; outline-offset: 2px; }
-    </style>
+    <link rel="stylesheet" href="allwyn.css">
+    <script>
+        // Set the theme before first paint so a forced light theme does not
+        // flash dark. Kept inline and tiny for that reason; the rest of the
+        // theme logic is in allwyn.theme.js.
+        try {
+            const t = localStorage.getItem('allwyn.theme');
+            document.documentElement.setAttribute('data-theme',
+                (t === 'light' || t === 'system') ? t : 'dark');
+        } catch (_) { /* private mode: fall back to the system theme */ }
+    </script>
 </head>
 
 <body>
-    <header class="center">
-        <h1>Play with BEN</h1>
+    <div id="loader" hidden></div>
+
+    <header class="topbar">
+        <h1><span class="mark" aria-hidden="true">B</span> Bridge with BEN</h1>
+        <div class="topbar-actions">
+            <a class="btn" href="/home">Home</a>
+            <button type="button" class="btn" id="theme-toggle">Dark</button>
+        </div>
     </header>
 
     <p id="status" class="status" role="status" aria-live="polite" hidden></p>
-    <p id="notice" role="alert" aria-live="assertive" hidden></p>
-    <div id="loader"></div>
+    <p id="notice" class="notice" role="alert" aria-live="assertive" hidden></p>
 
     <main id="container">
-        <div id="north" class="grid-item" aria-label="North hand"></div>
+        <!-- The four seats around the table, laid out as the usual cross. -->
+        <div id="play-area">
+            <div id="north" class="hand" aria-label="North hand"></div>
+            <div id="west" class="hand" aria-label="West hand"></div>
 
-        <section id="auction-main" class="grid-item" aria-label="Auction">
-            <div id="auction-container"></div>
-            <div class="tricks">Tricks</div>
-            <div id="last-trick" style="visibility: hidden">Show last trick</div>
-            <div id="claim" style="visibility: hidden">Claim
-                <div id="claim-tricks"></div>
-            </div>
-            <div id="conceed" style="visibility: hidden">Conceed</div>
-        </section>
+            <section id="table" aria-label="Table">
+                <div id="table-container">
+                    <div class="table-grid-item label-number"><span class="seat-label"></span></div>
+                    <div class="table-grid-item label-north"><span class="seat-label">N</span></div>
+                    <div class="table-grid-item label-west"><span class="seat-label">W</span></div>
+                    <div class="table-grid-item trick-west"></div>
+                    <div class="table-grid-item trick-north"></div>
+                    <div class="table-grid-item trick-east"></div>
+                    <div class="table-grid-item label-east"><span class="seat-label">E</span></div>
+                    <div class="table-grid-item trick-south"></div>
+                    <div class="table-grid-item label-south"><span class="seat-label">S</span></div>
+                </div>
+            </section>
 
-        <div id="west" class="grid-item" aria-label="West hand"></div>
+            <div id="east" class="hand" aria-label="East hand"></div>
+            <div id="south" class="hand" aria-label="South hand"></div>
+        </div>
 
-        <section id="table" class="grid-item" aria-label="Table">
-            <div id="table-container">
-                <div class="table-grid-item label-number"><span class="seat-label"></span></div>
-                <div class="table-grid-item label-north"><span class="seat-label">N</span></div>
-                <div class="table-grid-item label-number"><span class="seat-label"></span></div>
-                <div class="table-grid-item label-west"><span class="seat-label">W</span></div>
-                <div class="table-grid-item trick-west"></div>
-                <div class="table-grid-item trick-north"></div>
-                <div class="table-grid-item trick-east"></div>
-                <div class="table-grid-item label-east"><span class="seat-label">E</span></div>
-                <div class="table-grid-item trick-south"></div>
-                <div class="table-grid-item label-south"><span class="seat-label">S</span></div>
-            </div>
-        </section>
+        <div id="bidding" aria-label="Bidding box"></div>
 
-        <div id="east" class="grid-item" aria-label="East hand"></div>
-        <div id="south" class="grid-item" aria-label="South hand"></div>
-        <div id="bidding" class="grid-item" aria-label="Bidding box"></div>
+        <aside id="sidebar">
+            <section id="auction-main" class="panel" aria-label="Auction">
+                <div id="auction-container"></div>
+                <div class="tricks">Tricks</div>
+                <div class="actions">
+                    <div id="last-trick" hidden>Show last trick</div>
+                    <div id="claim" hidden>Claim
+                        <div id="claim-tricks"></div>
+                    </div>
+                    <div id="conceed" hidden>Concede</div>
+                </div>
+            </section>
+
+            <div id="explain" class="explain" aria-label="Bidding explanations"></div>
+        </aside>
     </main>
 
-    <div id="explain" class="explain"></div>
-    <p><a id="homeLink" href="/home">Home</a></p>
-
-    <!-- Native dialogs: no jQuery UI, and no network needed to show them. -->
+    <!-- Native dialogs: no jQuery UI, and nothing fetched from a CDN. -->
     <dialog id="hint-dialog" aria-labelledby="hint-title">
         <h2 id="hint-title">Hint</h2>
-        <div id="hint-body"></div>
+        <div class="body" id="hint-body"></div>
         <form method="dialog" class="buttons">
-            <button value="close" autofocus>Close</button>
+            <button class="btn btn-primary" value="close" autofocus>Close</button>
         </form>
     </dialog>
 
     <dialog id="feedback-dialog" aria-labelledby="feedback-title">
-        <h2 id="feedback-title">Feedback</h2>
-        <label for="commentInput">Comments on this deal</label>
-        <textarea id="commentInput" placeholder="Enter your comments here..."></textarea>
+        <h2 id="feedback-title">How did that deal go?</h2>
+        <div class="body">
+            <label for="commentInput">Comments on this deal</label>
+            <textarea id="commentInput" placeholder="Anything worth noting..."></textarea>
+        </div>
         <form method="dialog" class="buttons">
-            <button value="nosave">Do not save</button>
-            <button value="bad">Bad</button>
-            <button value="ok">OK</button>
-            <button value="good" autofocus>Good</button>
+            <button class="btn" value="nosave">Don't save</button>
+            <button class="btn" value="bad">Bad</button>
+            <button class="btn" value="ok">OK</button>
+            <button class="btn btn-primary" value="good" autofocus>Good</button>
         </form>
     </dialog>
 

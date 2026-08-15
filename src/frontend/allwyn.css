@@ -17,8 +17,8 @@
     --bg:            #0e1116;
     --bg-raised:     #161b22;
     --bg-sunken:     #0a0d12;
-    --felt:          #14342b;
-    --felt-edge:     #1d4a3d;
+    --felt:          #0a5228;   /* billiards cloth: darker towards the rails */
+    --felt-edge:     #14803f;   /* lit centre of the table */
 
     --text:          #e6edf3;
     --text-muted:    #8b949e;
@@ -65,8 +65,9 @@
        box is the same size empty as it is full. */
     --hand-h: calc(var(--card-h) * 4 + 14px);
     --hand-row-h: calc(var(--card-h) + 12px);  /* North/South: suits side by side */
+    --table-w: 32.5rem;
     --table-h: 21.5rem;
-    --biddingbox-h: 4.75rem;
+    --biddingbox-h: 5rem;
 }
 
 /*
@@ -82,8 +83,8 @@
         --bg:            #f6f7f9;
         --bg-raised:     #ffffff;
         --bg-sunken:     #eceef1;
-        --felt:          #e8ede9;
-        --felt-edge:     #cfdad3;
+        --felt:          #0d6b34;
+        --felt-edge:     #1a9b4d;
 
         --text:          #1c2128;
         --text-muted:    #57606a;
@@ -114,8 +115,8 @@
     --bg: #f6f7f9;
     --bg-raised: #ffffff;
     --bg-sunken: #eceef1;
-    --felt: #e8ede9;
-    --felt-edge: #cfdad3;
+    --felt: #0d6b34;
+    --felt-edge: #1a9b4d;
     --text: #1c2128;
     --text-muted: #57606a;
     --text-faint: #8c959f;
@@ -146,8 +147,9 @@ body {
     background: var(--bg);
     color: var(--text);
     font-family: var(--font);
-    font-size: 15px;
+    font-size: 16px;
     line-height: 1.45;
+    font-weight: 500;
     -webkit-font-smoothing: antialiased;
 }
 
@@ -278,7 +280,7 @@ a:hover { text-decoration: underline; }
     margin-inline: auto;
     display: grid;
     gap: var(--space-2);
-    grid-template-columns: minmax(76px, 0.7fr) minmax(0, 2fr) minmax(76px, 0.7fr);
+    grid-template-columns: minmax(76px, 1fr) var(--table-w) minmax(76px, 1fr);
     grid-template-rows: var(--hand-row-h) var(--table-h) var(--hand-row-h);
     grid-template-areas:
         ".    north ."
@@ -334,9 +336,10 @@ a:hover { text-decoration: underline; }
     border-radius: var(--radius-lg);
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%), var(--shadow-sm);
     padding: var(--space-3);
+    /* Fixed both ways: the felt is the same size all game, whatever the hands
+       beside it are doing. */
+    width: var(--table-w);
     height: var(--table-h);
-    width: 100%;
-    max-width: 520px;
     margin-inline: auto;
 }
 
@@ -387,8 +390,8 @@ a:hover { text-decoration: underline; }
     background: var(--bg-sunken);
     border: 1px solid var(--border);
     color: var(--text-muted);
-    font-size: 0.78rem;
-    font-weight: 600;
+    font-size: 0.9rem;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
     transition: background var(--speed), color var(--speed), box-shadow var(--speed);
 }
@@ -429,7 +432,8 @@ a:hover { text-decoration: underline; }
     border: 1px solid rgb(0 0 0 / 18%);
     border-radius: 6px;
     box-shadow: var(--shadow-sm);
-    font-size: 1.15rem;
+    font-size: 1.35rem;
+    font-weight: 700;
     line-height: 1;
     cursor: pointer;
     user-select: none;
@@ -448,8 +452,8 @@ a:hover { text-decoration: underline; }
     position: absolute;
     top: 4px;
     left: 5px;
-    font-size: 0.92rem;
-    font-weight: 700;
+    font-size: 1.05rem;
+    font-weight: 800;
     font-family: var(--font-num);
 }
 
@@ -475,14 +479,15 @@ a:hover { text-decoration: underline; }
 #auction table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
 #auction th {
     padding: 4px 6px;
     text-align: center;
-    font-size: 0.68rem;
-    font-weight: 600;
+    font-size: 0.75rem;
+    font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--text-faint);
@@ -506,7 +511,8 @@ a:hover { text-decoration: underline; }
     background: var(--bg-sunken);
     border: 1px solid var(--border);
     color: var(--text-muted);
-    font-size: 0.8rem;
+    font-size: 0.9rem;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
     text-align: center;
 }
@@ -548,7 +554,7 @@ a:hover { text-decoration: underline; }
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     color: var(--text-muted);
-    font-size: 0.82rem;
+    font-size: 0.9rem;
     max-height: 9rem;
     overflow-y: auto;
 }
@@ -594,8 +600,8 @@ a:hover { text-decoration: underline; }
     border: 1px solid var(--border);
     background: var(--bg-sunken);
     color: var(--text);
-    font-size: 0.88rem;
-    font-weight: 500;
+    font-size: 1rem;
+    font-weight: 700;
     cursor: pointer;
     transition: border-color var(--speed), background var(--speed), color var(--speed);
 }
@@ -617,7 +623,7 @@ a:hover { text-decoration: underline; }
 /* Dimmed rather than absent before a level is chosen, so the two-step bid is
    visible. Lighter than .invalid, which means "illegal call". */
 #bidding-suits.awaiting-level div { opacity: 0.45; }
-#bidding-suits div { font-size: 1rem; }
+#bidding-suits div { font-size: 1.2rem; }
 #bidding-calls .pass { color: var(--green); }
 #bidding-calls .double, #bidding-calls .redouble { color: var(--red); }
 #bidding-calls .hint { color: var(--accent); }
@@ -679,7 +685,8 @@ dialog .buttons button { font: inherit; }
         grid-template-areas: "play" "bidding" "sidebar";
     }
     #play-area { grid-template-columns: minmax(60px, 1fr) minmax(0, 2fr) minmax(60px, 1fr); }
-    #table { height: 16rem; }
+    #table { width: 100%; max-width: var(--table-w); height: 16rem; }
+    #play-area { grid-template-columns: minmax(60px, 1fr) minmax(0, 2fr) minmax(60px, 1fr); }
     .card { width: 2.2rem; height: 3.1rem; }
     .hand .card { margin-left: -0.9rem; }
 }

@@ -37,6 +37,10 @@ export class GameState {
         // on from: rendering straight from currentTrick would wipe the four
         // cards the instant the trick finished.
         this.pendingTrick = null;
+        // Seats whose cards the player is allowed to see. Once a hand has been
+        // shown it stays shown: the rules below say when a hand first becomes
+        // visible, not when it should be taken away again.
+        this.revealed = new Set();
         this.busy = false;
 
         this.connection = { status: 'connecting', detail: '' };
@@ -75,6 +79,7 @@ export class GameState {
                 this.alertArmed = false;
                 this.claimAvailable = false;
                 this.concedeAvailable = false;
+                this.revealed = new Set();
                 break;
             }
 
@@ -206,8 +211,35 @@ export class GameState {
             }
         }
 
+        this.updateRevealed();
         this.notify();
         return effects;
+    }
+
+    /**
+     * Work out which hands the player may see and remember them.
+     * Ported from updateTable() in bridge.html - your own seats, dummy once it
+     * is down, and declarer's hand while dummy is on play - except that this
+     * only ever adds. bridge.html re-evaluates the same test on every message
+     * and hides anything that fails it, so a hand disappears as soon as the turn
+     * moves on.
+     */
+    updateRevealed() {
+        if (!this.deal) return;
+        for (let seat = 0; seat < 4; seat++) {
+            if (this.revealed.has(seat)) continue;
+
+            let visible = (this.deal.hands[seat].isPublic || this.options.noHuman)
+                && (this.options.allVisible || this.deal.turn === seat);
+
+            if (this.deal.dummy !== undefined) {
+                if (seat === this.deal.dummy) visible = true;
+                const partner = (seat + 2) % 4;
+                if (partner === this.deal.dummy
+                    && (partner === this.deal.turn || seat === this.deal.turn)) visible = true;
+            }
+            if (visible) this.revealed.add(seat);
+        }
     }
 
     /** Called when the player clicks a card; validates before sending. */

@@ -186,6 +186,29 @@ check('?autoplay=1 hands the acknowledgement to a timer', () => {
     assert.equal(run({ ...defaultOptions, autoplay: false }), undefined, 'off unless asked for');
 });
 
+check('a hand stays visible once it has been shown', () => {
+    // South is the human. Their hand must not vanish when the turn moves on,
+    // and dummy must stay on the table for the rest of the deal.
+    const state = new GameState({ ...defaultOptions, humanSeats: [false, false, true, false], noHuman: false });
+    state.apply({ message: 'deal_start', dealer: 2, vuln: [false, false], hand: ['', '', 'AK.QJ.T9.8765', ''], board_no: 1 });
+    assert.equal(state.revealed.has(2), true, 'own hand visible on your turn');
+
+    // North bids: the turn is no longer South's.
+    state.apply({ message: 'bid_made', auction: ['PASS'] });
+    assert.equal(state.revealed.has(2), true, 'own hand still visible off turn');
+
+    state.apply({ message: 'auction_end', auction: ['1N', 'PASS', 'PASS', 'PASS'], declarer: 0, strain: 0 });
+    state.apply({ message: 'show_dummy', player: 2, dummy: 'AK.QJ.T9.8765' });
+    assert.equal(state.revealed.has(2), true, 'dummy visible');
+
+    // Play three cards, moving the turn right around the table.
+    ['S4', 'SA', 'S9'].forEach((c, i) => state.apply({ message: 'card_played', card: c, player: i }));
+    assert.equal(state.revealed.has(2), true, 'still visible after other seats play');
+
+    // Seats we were never entitled to see stay hidden.
+    assert.equal(state.revealed.has(1), false, 'an opponent hand is not revealed');
+});
+
 check('canPlay refuses a card that is not on turn or not legal', () => {
     const state = new GameState({ ...defaultOptions, humanSeats: [false, false, true, false], noHuman: false });
     state.apply({ message: 'deal_start', dealer: 0, vuln: [false, false], hand: ['', '', 'AK.QJ.T9.8765', ''], board_no: 1 });

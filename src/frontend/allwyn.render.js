@@ -52,22 +52,9 @@ function cardElement(card) {
     return el;
 }
 
-/**
- * Which hands the player is allowed to see. Ported from updateTable() in
- * bridge.html: your own hands, dummy once it is down, and declarer's hand while
- * dummy is on play.
- */
+/** Which hands the player may see - decided in GameState.updateRevealed(). */
 function handIsVisible(state, seat) {
-    const { deal, options } = state;
-    let visible = (deal.hands[seat].isPublic || options.noHuman)
-        && (options.allVisible || deal.turn === seat);
-
-    if (deal.dummy !== undefined) {
-        if (seat === deal.dummy) visible = true;
-        const partner = (seat + 2) % 4;
-        if (partner === deal.dummy && (partner === deal.turn || seat === deal.turn)) visible = true;
-    }
-    return visible;
+    return state.revealed.has(seat);
 }
 
 function renderHands(state, dom) {
@@ -77,7 +64,7 @@ function renderHands(state, dom) {
         if (!element) return;
 
         if (!handIsVisible(state, seat)) {
-            if (hand.rendered) element.style.visibility = 'hidden';
+            element.style.visibility = 'hidden';
             return;
         }
 

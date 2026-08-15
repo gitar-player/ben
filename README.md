@@ -134,6 +134,10 @@ A finished trick stays on the table in `allwyn.html` until you click, whatever t
 "Autocomplete trick after N seconds" box says - that box ships ticked, and honouring it clears
 every trick before you have read it. `bridge.html` still obeys it.
 
+Hands you are entitled to see - your own, dummy once it is down - stay on screen for the rest of
+the deal. `bridge.html` re-tests visibility on every message and hides a hand as soon as the turn
+moves on, so declarer's cards vanish while the other seats play.
+
 For hands-free viewing, add `&autoplay=1` to the play URL: each trick is then acknowledged for
 you after `T` seconds (2 if no `T` is given). It is opt-in precisely because the home page's
 box is not.

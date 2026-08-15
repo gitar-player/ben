@@ -213,7 +213,6 @@ function renderBiddingBox(state, dom) {
         if (i < minStrain) el.classList.add('invalid');
     });
     suits.classList.toggle('awaiting-level', state.selectedLevel === null);
-    box.appendChild(suits);
 
     const calls = document.createElement('div');
     calls.id = 'bidding-calls';
@@ -229,6 +228,7 @@ function renderBiddingBox(state, dom) {
     addCall('alert', 'Alert');
     addCall('hint', 'Hint');
     box.appendChild(calls);
+    box.appendChild(suits);
 
     dom.bidding.appendChild(box);
 }

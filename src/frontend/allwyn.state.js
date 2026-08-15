@@ -24,6 +24,10 @@ export class GameState {
         this.expectTrickConfirm = false;
 
         this.alertArmed = false;
+        // Which bid level the player has picked, so the strain row can be shown.
+        // Held in state rather than as a class on the DOM: the box is rebuilt on
+        // every render, and an imperative tweak would be lost by the next message.
+        this.selectedLevel = null;
         this.explanations = [];
         this.claimAvailable = false;
         this.concedeAvailable = false;
@@ -75,6 +79,7 @@ export class GameState {
                 this.explanations.push({ call: lastCall, text: message.explanation ?? '' });
                 this.deal.advanceTurn();
                 this.alertArmed = false;
+                this.selectedLevel = null;
                 break;
             }
 
@@ -83,6 +88,7 @@ export class GameState {
                 this.deal.canDouble = Boolean(message.can_double);
                 this.deal.canRedouble = Boolean(message.can_redouble);
                 this.expectBidInput = true;
+                this.selectedLevel = null;
                 break;
             }
 

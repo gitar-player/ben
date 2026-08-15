@@ -190,13 +190,16 @@ function renderBiddingBox(state, dom) {
         el.textContent = String(level);
         if (level < minLevel) el.classList.add('invalid');
         else el.dataset.level = String(level);
+        if (state.selectedLevel === level) el.classList.add('selected');
         levels.appendChild(el);
     }
     box.appendChild(levels);
 
+    // The strains only appear once a level is chosen, and then only those high
+    // enough to be a legal call over the last bid.
     const suits = document.createElement('div');
     suits.id = 'bidding-suits';
-    suits.classList.add('hidden');
+    if (state.selectedLevel === null) suits.classList.add('hidden');
     [
         ['bid-clubs', 'C', SUIT_ENTITIES[3], false],
         ['bid-diamonds', 'D', SUIT_ENTITIES[2], true],
@@ -210,6 +213,12 @@ function renderBiddingBox(state, dom) {
         el.textContent = glyph;
         suits.appendChild(el);
     });
+    if (state.selectedLevel !== null) {
+        const minStrain = auction.getMinBiddableSuitForLevel(state.selectedLevel);
+        [...suits.children].forEach((el, i) => {
+            if (i < minStrain) el.classList.add('invalid');
+        });
+    }
     box.appendChild(suits);
 
     const calls = document.createElement('div');

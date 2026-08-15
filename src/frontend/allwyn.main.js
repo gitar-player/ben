@@ -152,25 +152,19 @@ dom.bidding?.addEventListener('click', (event) => {
     if (!state.expectBidInput || target.classList.contains('invalid')) return;
 
     if (target.dataset.level) {
-        const level = Number(target.dataset.level);
-        dom.bidding.querySelectorAll('#bidding-levels div').forEach((el) => el.classList.remove('selected'));
-        dom.bidding.querySelectorAll('#bidding-suits div').forEach((el) => el.classList.remove('invalid'));
-        target.classList.add('selected');
-
-        const minSuit = state.deal.auctionModel.getMinBiddableSuitForLevel(level);
-        const suitElements = ['.bid-clubs', '.bid-diamonds', '.bid-hearts', '.bid-spades', '.bid-nt'];
-        for (let i = 0; i < minSuit; i++) {
-            dom.bidding.querySelector(suitElements[i])?.classList.add('invalid');
-        }
+        // Record the choice and re-render; the renderer reveals the strain row
+        // and greys out the strains too low to be a legal call.
+        state.selectedLevel = Number(target.dataset.level);
+        state.notify();
         return;
     }
 
     const symbol = target.getAttribute('symbol');
     if (symbol) {
-        const selected = dom.bidding.querySelector('#bidding-levels .selected');
-        if (!selected) return;
-        if (send(OUTBOUND.bid(selected.textContent + symbol))) {
+        if (state.selectedLevel === null) return;
+        if (send(OUTBOUND.bid(`${state.selectedLevel}${symbol}`))) {
             state.expectBidInput = false;
+            state.selectedLevel = null;
             state.busy = true;
             state.notify();
         }
@@ -186,6 +180,7 @@ dom.bidding?.addEventListener('click', (event) => {
     } else if (['PASS', 'X', 'XX'].includes(text)) {
         if (send(OUTBOUND.bid(text))) {
             state.expectBidInput = false;
+            state.selectedLevel = null;
             state.busy = true;
             state.notify();
         }

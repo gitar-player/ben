@@ -32,6 +32,11 @@ export class GameState {
         this.claimAvailable = false;
         this.concedeAvailable = false;
         this.showLastTrick = false;
+        // A completed trick stays on the table until the player acknowledges it.
+        // Held separately from currentTrick, which the server has already moved
+        // on from: rendering straight from currentTrick would wipe the four
+        // cards the instant the trick finished.
+        this.pendingTrick = null;
         this.busy = false;
 
         this.connection = { status: 'connecting', detail: '' };
@@ -154,13 +159,15 @@ export class GameState {
                 break;
 
             case 'trick_confirm': {
-                const winner = this.deal.currentTrick.winner(this.deal.strain);
+                const completed = this.deal.currentTrick;
+                const winner = completed.winner(this.deal.strain);
                 this.deal.turn = winner;
-                this.deal.tricks.push(this.deal.currentTrick);
+                this.deal.tricks.push(completed);
                 this.deal.tricksCount[winner % 2] += 1;
                 this.deal.currentTrick = new Trick(winner, []);
+                this.pendingTrick = completed;      // keep it on the table
                 this.expectTrickConfirm = true;
-                this.showLastTrick = true;
+                this.showLastTrick = false;
                 if (this.options.autocomplete) {
                     effects.push({ type: 'schedule-trick-confirm', seconds: this.options.timeoutSeconds });
                 }

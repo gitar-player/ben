@@ -114,6 +114,7 @@ function send(payload) {
 function confirmTrick() {
     if (!state.expectTrickConfirm) return;
     state.expectTrickConfirm = false;
+    state.pendingTrick = null;          // clear the trick off the table
     state.showLastTrick = false;
     state.busy = true;
     clearTimeout(trickTimer);

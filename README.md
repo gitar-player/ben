@@ -130,6 +130,10 @@ node src/frontend/allwyn.test.mjs                       # model, protocol and st
 node src/frontend/allwyn.test.mjs recorded-session.json # plus a replay of a real deal
 ```
 
+A finished trick stays on the table in `allwyn.html` until you click, whatever the home page's
+"Autocomplete trick after N seconds" box says - that box ships ticked, and honouring it clears
+every trick before you have read it. `bridge.html` still obeys it.
+
 `bridge.html` is deliberately untouched by all of this, so upstream changes to it still merge.
 
 #### Starting it automatically at login (macOS)

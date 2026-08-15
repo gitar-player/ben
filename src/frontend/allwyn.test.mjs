@@ -156,19 +156,20 @@ check('claim is offered on lead but not on the opening lead', () => {
     assert.equal(state.claimAvailable, true, 'claiming allowed on lead later on');
 });
 
-check('autocomplete asks for a trick-confirm timer, otherwise it does not', () => {
-    const withAuto = new GameState({ ...defaultOptions, autocomplete: 'x', timeoutSeconds: 2 });
-    withAuto.apply({ message: 'deal_start', dealer: 0, vuln: [false, false], hand: ['AK...', '', '', ''], board_no: 1 });
-    withAuto.apply({ message: 'auction_end', auction: [], declarer: 0, strain: 0 });
-    ['S4', 'SA', 'S9', 'S2'].forEach((c, i) => withAuto.apply({ message: 'card_played', card: c, player: (1 + i) % 4 }));
-    const effects = withAuto.apply({ message: 'trick_confirm' });
-    assert.ok(effects.some((e) => e.type === 'schedule-trick-confirm'));
+check('a finished trick always waits for the player, never a timer', () => {
+    // The home page ticks "Autocomplete trick after N seconds" by default, so
+    // this must hold even when the option is set.
+    for (const options of [defaultOptions, { ...defaultOptions, autocomplete: 'x', timeoutSeconds: 2 }]) {
+        const state = new GameState(options);
+        state.apply({ message: 'deal_start', dealer: 0, vuln: [false, false], hand: ['AK...', '', '', ''], board_no: 1 });
+        state.apply({ message: 'auction_end', auction: [], declarer: 0, strain: 0 });
+        ['S4', 'SA', 'S9', 'S2'].forEach((c, i) => state.apply({ message: 'card_played', card: c, player: (1 + i) % 4 }));
 
-    const manual = new GameState(defaultOptions);
-    manual.apply({ message: 'deal_start', dealer: 0, vuln: [false, false], hand: ['AK...', '', '', ''], board_no: 1 });
-    manual.apply({ message: 'auction_end', auction: [], declarer: 0, strain: 0 });
-    ['S4', 'SA', 'S9', 'S2'].forEach((c, i) => manual.apply({ message: 'card_played', card: c, player: (1 + i) % 4 }));
-    assert.equal(manual.apply({ message: 'trick_confirm' }).some((e) => e.type === 'schedule-trick-confirm'), false);
+        const effects = state.apply({ message: 'trick_confirm' });
+        assert.equal(effects.some((e) => e.type === 'schedule-trick-confirm'), false, 'no auto-advance timer');
+        assert.equal(state.expectTrickConfirm, true, 'waiting for the click');
+        assert.equal(state.pendingTrick?.cards.length, 4, 'all four cards still on the table');
+    }
 });
 
 check('canPlay refuses a card that is not on turn or not legal', () => {

@@ -96,8 +96,8 @@ ports, but note the UI expects the gameserver on 4443 (see the dropdown note bel
 
 #### Choosing the play UI
 
-There are two front ends for the same game. They speak the same websocket protocol and share
-`style.css`, so the choice only changes the markup and the client code:
+There are two front ends for the same game. They speak the same websocket protocol but have
+separate markup, client code and stylesheets, so they can look nothing alike:
 
 | `--ui` | Page | |
 | --- | --- | --- |

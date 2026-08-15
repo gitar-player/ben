@@ -66,6 +66,9 @@
     --hand-h: calc(var(--card-h) * 4 + 14px);
     --hand-row-h: calc(var(--card-h) + 12px);  /* North/South: suits side by side */
     --table-w: 32.5rem;
+    /* Wide enough for an eight-card suit at the current overlap, so East and
+       West keep one width from deal to last trick. */
+    --side-hand-w: 13rem;
     --table-h: 21.5rem;
     --biddingbox-h: 5rem;
 }
@@ -276,11 +279,11 @@ a:hover { text-decoration: underline; }
 
 #play-area {
     grid-area: play;
-    max-width: 900px;
+    max-width: 62rem;
     margin-inline: auto;
     display: grid;
     gap: var(--space-2);
-    grid-template-columns: minmax(76px, 1fr) var(--table-w) minmax(76px, 1fr);
+    grid-template-columns: minmax(var(--side-hand-w), 1fr) var(--table-w) minmax(var(--side-hand-w), 1fr);
     grid-template-rows: var(--hand-row-h) var(--table-h) var(--hand-row-h);
     grid-template-areas:
         ".    north ."
@@ -318,6 +321,11 @@ a:hover { text-decoration: underline; }
 /* North and South get their suits side by side: one line of cards rather than
    four, which keeps the table within a laptop screen. East and West stay
    stacked, since their columns are narrow. */
+#east, #west {
+    width: var(--side-hand-w);
+    justify-content: center;
+}
+
 #north, #south {
     height: var(--hand-row-h);
     flex-direction: row;
@@ -684,9 +692,11 @@ dialog .buttons button { font: inherit; }
         grid-template-columns: minmax(0, 1fr);
         grid-template-areas: "play" "bidding" "sidebar";
     }
-    #play-area { grid-template-columns: minmax(60px, 1fr) minmax(0, 2fr) minmax(60px, 1fr); }
+    #play-area { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); }
+    #east, #west { width: auto; }
     #table { width: 100%; max-width: var(--table-w); height: 16rem; }
-    #play-area { grid-template-columns: minmax(60px, 1fr) minmax(0, 2fr) minmax(60px, 1fr); }
+    #play-area { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); }
+    #east, #west { width: auto; }
     .card { width: 2.2rem; height: 3.1rem; }
     .hand .card { margin-left: -0.9rem; }
 }

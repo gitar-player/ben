@@ -270,7 +270,7 @@ a:hover { text-decoration: underline; }
     max-width: 1280px;
     margin: 0 auto;
     gap: var(--space-4);
-    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-columns: minmax(0, 1fr) 22rem;
     grid-template-areas:
         "play    sidebar"
         "bidding sidebar";
@@ -494,7 +494,7 @@ a:hover { text-decoration: underline; }
 #auction th {
     padding: 4px 6px;
     text-align: center;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
@@ -503,7 +503,8 @@ a:hover { text-decoration: underline; }
 }
 #auction th.red { color: var(--red); }
 #auction td {
-    padding: 3px 6px;
+    padding: 5px 6px;
+    font-weight: 700;
     text-align: center;
     border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
     cursor: default;
@@ -518,9 +519,9 @@ a:hover { text-decoration: underline; }
     border-radius: var(--radius);
     background: var(--bg-sunken);
     border: 1px solid var(--border);
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    font-weight: 600;
+    color: var(--text);
+    font-size: 1rem;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
     text-align: center;
 }
@@ -533,8 +534,9 @@ a:hover { text-decoration: underline; }
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--bg-sunken);
-    color: var(--text-muted);
-    font-size: 0.8rem;
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 600;
     cursor: pointer;
     display: inline-block;
     transition: border-color var(--speed), color var(--speed);
@@ -549,25 +551,25 @@ a:hover { text-decoration: underline; }
     border-radius: var(--radius-sm);
     background: var(--bg-raised);
     border: 1px solid var(--border);
-    font-size: 0.78rem;
+    font-size: 0.95rem;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
 }
 #claim-tricks div:hover { border-color: var(--accent); color: var(--accent); }
 
 #explain {
-    max-width: 1200px;
-    margin: var(--space-4) auto 0;
+    margin: 0;
     padding: var(--space-3);
     background: var(--bg-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    max-height: 9rem;
-    overflow-y: auto;
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.5;
 }
 #explain:empty { display: none; }
-#explain div { padding: 2px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
+#explain div { padding: 4px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
 #explain div:last-child { border-bottom: none; }
 
 /* ------------------------------------------------------------ bidding box */

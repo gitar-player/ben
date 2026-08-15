@@ -34,7 +34,7 @@ UI_PAGES = {
     "bridge": "bridge.html",
     "allwyn": "allwyn.html",
 }
-DEFAULT_UI = "bridge"
+DEFAULT_UI = "allwyn"
 UI_PAGE = UI_PAGES[DEFAULT_UI]
 
 # Configure logging

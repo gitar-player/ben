@@ -101,14 +101,14 @@ There are two front ends for the same game. They speak the same websocket protoc
 
 | `--ui` | Page | |
 | --- | --- | --- |
-| `bridge` (default) | `bridge.html` | The original UI, unmodified. |
-| `allwyn` | `allwyn.html` | Rewrite: ES modules, no jQuery, native `<dialog>`, no CDN. |
+| `allwyn` (default) | `allwyn.html` | Rewrite: ES modules, no jQuery, native `<dialog>`, no CDN. |
+| `bridge` | `bridge.html` | The original UI, unmodified. Upstream's version, kept working. |
 
 ```bash
-BEN_UI=allwyn ./start_ben.sh          # or: python appserver.py --ui allwyn
+BEN_UI=bridge ./start_ben.sh          # or: python appserver.py --ui bridge
 ```
 
-`appserver.py` takes `--ui`, defaulting to `$BEN_UI` and then to `bridge`; `start_ben.sh` passes
+`appserver.py` takes `--ui`, defaulting to `$BEN_UI` and then to `allwyn`; `start_ben.sh` passes
 `BEN_UI` through. The setting decides where every "play" link points, so it applies to the home
 page, the deal list and the replay links alike. The banner in `logs/appserver.log` says which one
 is live.

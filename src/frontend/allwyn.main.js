@@ -17,6 +17,8 @@ const options = readOptions();
 const dom = collectDom();
 const state = new GameState(options);
 
+let trickTimer = null;
+
 initTheme(document.querySelector('#theme-toggle'));
 
 const socket = new GameSocket(
@@ -43,6 +45,10 @@ function handle(message) {
                 break;
             case 'claim-accepted':
                 showNotice('Claim accepted.');
+                break;
+            case 'schedule-trick-confirm':
+                clearTimeout(trickTimer);
+                trickTimer = setTimeout(confirmTrick, Math.max(0, effect.seconds) * 1000);
                 break;
             case 'deal-end':
                 openFeedbackDialog(effect.dict);
@@ -111,6 +117,7 @@ function confirmTrick() {
     state.pendingTrick = null;          // clear the trick off the table
     state.showLastTrick = false;
     state.busy = true;
+    clearTimeout(trickTimer);
     if (send(OUTBOUND.confirmTrick())) state.notify();
 }
 

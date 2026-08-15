@@ -134,6 +134,10 @@ A finished trick stays on the table in `allwyn.html` until you click, whatever t
 "Autocomplete trick after N seconds" box says - that box ships ticked, and honouring it clears
 every trick before you have read it. `bridge.html` still obeys it.
 
+For hands-free viewing, add `&autoplay=1` to the play URL: each trick is then acknowledged for
+you after `T` seconds (2 if no `T` is given). It is opt-in precisely because the home page's
+box is not.
+
 `bridge.html` is deliberately untouched by all of this, so upstream changes to it still merge.
 
 #### Starting it automatically at login (macOS)

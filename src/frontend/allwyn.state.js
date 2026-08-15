@@ -168,10 +168,14 @@ export class GameState {
                 this.pendingTrick = completed;      // keep it on the table
                 this.expectTrickConfirm = true;
                 this.showLastTrick = false;
-                // No timer: a finished trick waits for the player. The home page
-                // ships its "Autocomplete trick after N seconds" box ticked, so
-                // honouring it would whisk every trick away by default, which is
-                // not what you want when you are reading the cards.
+                // A finished trick waits for the player. The home page's
+                // "Autocomplete trick after N seconds" box is ticked by default,
+                // so it is deliberately not honoured here; only an explicit
+                // ?autoplay=1 hands the acknowledgement over to a timer.
+                if (this.options.autoplay) {
+                    const seconds = this.options.timeoutSeconds > 0 ? this.options.timeoutSeconds : 2;
+                    effects.push({ type: 'schedule-trick-confirm', seconds });
+                }
                 break;
             }
 

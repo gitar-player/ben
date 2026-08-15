@@ -156,7 +156,7 @@ check('claim is offered on lead but not on the opening lead', () => {
     assert.equal(state.claimAvailable, true, 'claiming allowed on lead later on');
 });
 
-check('a finished trick always waits for the player, never a timer', () => {
+check('a finished trick waits for the player, even with the home page option on', () => {
     // The home page ticks "Autocomplete trick after N seconds" by default, so
     // this must hold even when the option is set.
     for (const options of [defaultOptions, { ...defaultOptions, autocomplete: 'x', timeoutSeconds: 2 }]) {
@@ -170,6 +170,20 @@ check('a finished trick always waits for the player, never a timer', () => {
         assert.equal(state.expectTrickConfirm, true, 'waiting for the click');
         assert.equal(state.pendingTrick?.cards.length, 4, 'all four cards still on the table');
     }
+});
+
+check('?autoplay=1 hands the acknowledgement to a timer', () => {
+    const run = (options) => {
+        const state = new GameState(options);
+        state.apply({ message: 'deal_start', dealer: 0, vuln: [false, false], hand: ['AK...', '', '', ''], board_no: 1 });
+        state.apply({ message: 'auction_end', auction: [], declarer: 0, strain: 0 });
+        ['S4', 'SA', 'S9', 'S2'].forEach((c, i) => state.apply({ message: 'card_played', card: c, player: (1 + i) % 4 }));
+        return state.apply({ message: 'trick_confirm' }).find((e) => e.type === 'schedule-trick-confirm');
+    };
+
+    assert.equal(run({ ...defaultOptions, autoplay: true, timeoutSeconds: 5 })?.seconds, 5, 'uses T when given');
+    assert.equal(run({ ...defaultOptions, autoplay: true, timeoutSeconds: 0 })?.seconds, 2, 'falls back to 2s');
+    assert.equal(run({ ...defaultOptions, autoplay: false }), undefined, 'off unless asked for');
 });
 
 check('canPlay refuses a card that is not on turn or not legal', () => {

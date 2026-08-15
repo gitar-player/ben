@@ -98,6 +98,11 @@ export function readOptions(search = window.location.search) {
         timeoutSeconds: Number(p.get('T')) || 0,
         humanDeclares: p.get('H'),
         autocomplete: p.get('A'),
+        // Hands-free viewing, opt-in only: ?autoplay=1 acknowledges each trick
+        // for you after a pause. Deliberately not wired to the home page's
+        // "Autocomplete" box, which is ticked by default and would take the
+        // choice away from anyone actually playing.
+        autoplay: ['1', 'x', 'true'].includes((p.get('autoplay') || '').toLowerCase()),
         continuous: p.get('C'),
         rotate: p.get('R'),
         allVisible: p.get('V') === 'x',

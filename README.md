@@ -108,6 +108,9 @@ separate markup, client code and stylesheets, so they can look nothing alike:
 BEN_UI=bridge ./start_ben.sh          # or: python appserver.py --ui bridge
 ```
 
+If anything looks off in `allwyn.html`, `BEN_UI=bridge ./start_ben.sh --force` puts you back on
+the old UI immediately.
+
 `appserver.py` takes `--ui`, defaulting to `$BEN_UI` and then to `allwyn`; `start_ben.sh` passes
 `BEN_UI` through. The setting decides where every "play" link points, so it applies to the home
 page, the deal list and the replay links alike. The banner in `logs/appserver.log` says which one

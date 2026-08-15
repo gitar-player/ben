@@ -55,6 +55,18 @@
     --font-num: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
 
     --speed: 140ms;
+
+    /* Geometry the layout reserves space from. A hand is one row per suit, so
+       its height is fixed whatever the cards are - otherwise the felt slides up
+       and down as suits empty during play. */
+    --card-w: 2.6rem;
+    --card-h: 3.7rem;
+    /* East/West: four suit rows, plus 3 x 2px gaps and 2 x 4px padding, so the
+       box is the same size empty as it is full. */
+    --hand-h: calc(var(--card-h) * 4 + 14px);
+    --hand-row-h: calc(var(--card-h) + 12px);  /* North/South: suits side by side */
+    --table-h: 21.5rem;
+    --biddingbox-h: 4.75rem;
 }
 
 /*
@@ -267,7 +279,7 @@ a:hover { text-decoration: underline; }
     display: grid;
     gap: var(--space-2);
     grid-template-columns: minmax(76px, 0.7fr) minmax(0, 2fr) minmax(76px, 0.7fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: var(--hand-row-h) var(--table-h) var(--hand-row-h);
     grid-template-areas:
         ".    north ."
         "west table east"
@@ -297,10 +309,21 @@ a:hover { text-decoration: underline; }
     gap: 2px;
     justify-content: center;
     align-items: center;
-    min-height: 66px;
+    height: var(--hand-h);
     padding: var(--space-1);
 }
-#west, #east { min-height: 0; }
+
+/* North and South get their suits side by side: one line of cards rather than
+   four, which keeps the table within a laptop screen. East and West stay
+   stacked, since their columns are narrow. */
+#north, #south {
+    height: var(--hand-row-h);
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-4);
+    min-height: var(--hand-row-h);
+}
 
 /* ------------------------------------------------------------------ table */
 
@@ -311,7 +334,7 @@ a:hover { text-decoration: underline; }
     border-radius: var(--radius-lg);
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%), var(--shadow-sm);
     padding: var(--space-3);
-    aspect-ratio: 1 / 0.66;
+    height: var(--table-h);
     width: 100%;
     max-width: 520px;
     margin-inline: auto;
@@ -394,8 +417,8 @@ a:hover { text-decoration: underline; }
 
 .card {
     position: relative;
-    width: 2.6rem;
-    height: 3.7rem;
+    width: var(--card-w);
+    height: var(--card-h);
     flex: 0 0 auto;
     display: flex;
     align-items: flex-end;
@@ -416,7 +439,7 @@ a:hover { text-decoration: underline; }
 /* Fan the hand: overlap, and lift the hovered card clear. */
 /* One row per suit. Declared here rather than relying on the inline
    display:flex the renderer sets, so the layout holds on its own. */
-.hand > div { display: flex; align-items: flex-start; }
+.hand > div { display: flex; align-items: flex-start; min-height: var(--card-h); }
 .hand .card { margin-left: -1.15rem; }
 .hand div > .card:first-child { margin-left: 0; }
 
@@ -442,7 +465,8 @@ a:hover { text-decoration: underline; }
 .trick-north .card:hover, .trick-south .card:hover,
 .trick-east .card:hover, .trick-west .card:hover { translate: none; box-shadow: var(--shadow-sm); }
 
-.empty-suit { min-height: 6px; }
+/* An empty suit keeps its row so the hand's height never changes. */
+.empty-suit { min-height: var(--card-h); }
 
 /* ---------------------------------------------------------------- auction */
 
@@ -534,8 +558,7 @@ a:hover { text-decoration: underline; }
 
 /* ------------------------------------------------------------ bidding box */
 
-#bidding { padding: 0; background: none; border: none; min-height: 0; }
-#bidding:empty { display: none; }
+#bidding { padding: 0; background: none; border: none; min-height: var(--biddingbox-h); }
 
 #bidding-box {
     max-width: 660px;
@@ -656,7 +679,7 @@ dialog .buttons button { font: inherit; }
         grid-template-areas: "play" "bidding" "sidebar";
     }
     #play-area { grid-template-columns: minmax(60px, 1fr) minmax(0, 2fr) minmax(60px, 1fr); }
-    #table { aspect-ratio: auto; min-height: 260px; }
+    #table { height: 16rem; }
     .card { width: 2.2rem; height: 3.1rem; }
     .hand .card { margin-left: -0.9rem; }
 }

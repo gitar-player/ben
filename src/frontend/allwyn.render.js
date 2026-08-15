@@ -248,7 +248,7 @@ function renderSeatLabels(state, dom) {
  * Built as nodes rather than markup, so the server's text is never parsed as
  * HTML.
  */
-function appendSuitText(parent, text) {
+export function appendSuitText(parent, text) {
     // split() with a capture group alternates text, letter, text, letter...
     String(text).split(/!([CDHS])/).forEach((part, i) => {
         if (i % 2 === 1) {
@@ -265,7 +265,7 @@ function appendSuitText(parent, text) {
 }
 
 /** The call a line is about: "1D" -> "1♦", but PASS/X/XX left as words. */
-function appendCall(parent, call) {
+export function appendCall(parent, call) {
     const bid = /^([1-7])([CDHSN])$/.exec(call ?? '');
     if (!bid) {
         parent.appendChild(document.createTextNode(call ?? ''));

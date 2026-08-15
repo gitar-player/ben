@@ -10,7 +10,7 @@ import { Card } from './allwyn.model.js';
 import { OUTBOUND, readOptions, buildQueryString } from './allwyn.protocol.js';
 import { GameSocket, gameServerUrl } from './allwyn.socket.js';
 import { GameState } from './allwyn.state.js';
-import { collectDom, render, renderClaimOptions } from './allwyn.render.js';
+import { collectDom, render, renderClaimOptions, appendSuitText, appendCall } from './allwyn.render.js';
 import { initTheme } from './allwyn.theme.js';
 
 const options = readOptions();
@@ -79,13 +79,13 @@ function showHint(bids) {
 
     body.replaceChildren();
     const suggestion = document.createElement('p');
-    suggestion.innerHTML = '';
-    suggestion.textContent = `BEN suggests: ${bids.bid}`;
+    suggestion.appendChild(document.createTextNode('BEN suggests: '));
+    appendCall(suggestion, bids.bid);
     body.appendChild(suggestion);
 
     if (bids.explanation) {
         const explanation = document.createElement('p');
-        explanation.textContent = bids.explanation;
+        appendSuitText(explanation, bids.explanation);
         body.appendChild(explanation);
     }
 
@@ -97,7 +97,8 @@ function showHint(bids) {
         const list = document.createElement('ul');
         for (const candidate of bids.candidates) {
             const item = document.createElement('li');
-            item.textContent = `${candidate.call} - score ${candidate.insta_score}`;
+            appendCall(item, candidate.call);
+            item.appendChild(document.createTextNode(` - score ${candidate.insta_score}`));
             list.appendChild(item);
         }
         body.appendChild(list);

@@ -417,11 +417,15 @@ a:hover { text-decoration: underline; }
     box-shadow: 0 0 0 4px var(--accent-soft);
 }
 
-.label-number .seat-label {
+.label-number, .label-number .seat-label {
     background: none;
     border: none;
-    color: var(--text-faint);
-    font-family: var(--font-num);
+    color: rgb(255 255 255 / 55%);
+    font-family: var(--font);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
 }
 
 /* ------------------------------------------------------------------ cards */

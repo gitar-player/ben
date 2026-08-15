@@ -266,7 +266,11 @@ export function render(state, dom) {
     if (dom.loader) dom.loader.hidden = !state.busy;
     if (!state.deal) return;
 
-    if (dom.boardNumber) dom.boardNumber.textContent = state.deal.boardNo ?? '';
+    // Labelled, because a bare number in the corner of the felt reads as an
+    // error code when the board happens to be numbered 404.
+    if (dom.boardNumber) {
+        dom.boardNumber.textContent = state.deal.boardNo ? `Board ${state.deal.boardNo}` : '';
+    }
     renderSeatLabels(state, dom);
     renderHands(state, dom);
     renderTrick(state, dom);

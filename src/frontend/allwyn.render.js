@@ -22,6 +22,7 @@ export function collectDom(root = document) {
         seatLabels: SEAT_LABELS.map((sel) => $(`${sel} .seat-label`)),
         boardNumber: $('.label-number'),
         auction: $('#auction-container'),
+        auctionPanel: $('#auction-main'),
         bidding: $('#bidding'),
         tricks: $('.tricks'),
         lastTrick: $('#last-trick'),
@@ -167,8 +168,7 @@ function renderAuction(state, dom) {
 
 function renderBiddingBox(state, dom) {
     clear(dom.bidding);
-    dom.bidding?.classList.toggle('collapsed', state.biddingHidden);
-    if (!state.expectBidInput || state.biddingHidden) return;
+    if (!state.expectBidInput) return;
 
     const auction = state.deal.auctionModel;
     const box = document.createElement('div');
@@ -309,6 +309,7 @@ export function render(state, dom) {
 
     // Labelled, because a bare number in the corner of the felt reads as an
     // error code when the board happens to be numbered 404.
+    if (dom.auctionPanel) dom.auctionPanel.hidden = state.auctionHidden;
     if (dom.boardNumber) {
         dom.boardNumber.textContent = state.deal.boardNo ? `Board ${state.deal.boardNo}` : '';
     }

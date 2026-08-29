@@ -41,9 +41,10 @@ export class GameState {
         // shown it stays shown: the rules below say when a hand first becomes
         // visible, not when it should be taken away again.
         this.revealed = new Set();
-        // Player's own choice to put the bidding box away; independent of
-        // whether the server is currently asking for a call.
-        this.biddingHidden = false;
+        // Player's own choice to put the auction panel away - the record of
+        // calls, the trick count and the claim/concede controls. Nothing to do
+        // with the bidding box, which comes and goes with the server's turn.
+        this.auctionHidden = false;
         this.busy = false;
 
         this.connection = { status: 'connecting', detail: '' };

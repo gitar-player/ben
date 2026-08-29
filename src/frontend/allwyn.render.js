@@ -167,7 +167,8 @@ function renderAuction(state, dom) {
 
 function renderBiddingBox(state, dom) {
     clear(dom.bidding);
-    if (!state.expectBidInput) return;
+    dom.bidding?.classList.toggle('collapsed', state.biddingHidden);
+    if (!state.expectBidInput || state.biddingHidden) return;
 
     const auction = state.deal.auctionModel;
     const box = document.createElement('div');

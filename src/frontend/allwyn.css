@@ -582,6 +582,8 @@ a:hover { text-decoration: underline; }
 /* ------------------------------------------------------------ bidding box */
 
 #bidding { padding: 0; background: none; border: none; min-height: var(--biddingbox-h); }
+/* Put away on purpose, so the reserved space goes with it. */
+#bidding.collapsed { min-height: 0; }
 
 /*
  * Two columns: levels with the strains beneath them on the left, the calls on

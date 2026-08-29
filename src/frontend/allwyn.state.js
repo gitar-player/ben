@@ -41,6 +41,9 @@ export class GameState {
         // shown it stays shown: the rules below say when a hand first becomes
         // visible, not when it should be taken away again.
         this.revealed = new Set();
+        // Player's own choice to put the bidding box away; independent of
+        // whether the server is currently asking for a call.
+        this.biddingHidden = false;
         this.busy = false;
 
         this.connection = { status: 'connecting', detail: '' };

@@ -21,6 +21,35 @@ let trickTimer = null;
 
 initTheme(document.querySelector('#theme-toggle'));
 
+/* Show/hide the bidding box. Like the theme button, it is labelled with what
+   clicking it does, and the choice is remembered between deals. */
+const biddingToggle = document.querySelector('#bidding-toggle');
+const BIDDING_KEY = 'allwyn.biddingHidden';
+
+function paintBiddingToggle() {
+    if (!biddingToggle) return;
+    biddingToggle.textContent = state.biddingHidden ? 'Show bidding' : 'Hide bidding';
+    biddingToggle.setAttribute('aria-pressed', String(state.biddingHidden));
+    biddingToggle.setAttribute('aria-label',
+        state.biddingHidden ? 'Show the bidding box' : 'Hide the bidding box');
+}
+
+try {
+    state.biddingHidden = localStorage.getItem(BIDDING_KEY) === '1';
+} catch (_) { /* private mode: start with it shown */ }
+paintBiddingToggle();
+
+biddingToggle?.addEventListener('click', (event) => {
+    event.stopPropagation();          // don't also acknowledge a finished trick
+    state.biddingHidden = !state.biddingHidden;
+    try {
+        if (state.biddingHidden) localStorage.setItem(BIDDING_KEY, '1');
+        else localStorage.removeItem(BIDDING_KEY);
+    } catch (_) { /* nothing to remember it with */ }
+    paintBiddingToggle();
+    state.notify();
+});
+
 const socket = new GameSocket(
     gameServerUrl(options, buildQueryString(options)),
     {

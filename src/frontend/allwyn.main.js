@@ -21,7 +21,8 @@ let trickTimer = null;
 
 initTheme(document.querySelector('#theme-toggle'));
 
-/* Show/hide the auction panel - the calls, trick count and claim controls.
+/* Show/hide the auction panel - the calls, trick count and claim controls -
+   together with the bid explanations beneath it.
    Labelled with what clicking it does, as the theme button is, and remembered
    between deals. */
 const auctionToggle = document.querySelector('#auction-toggle');
@@ -32,7 +33,7 @@ function paintAuctionToggle() {
     auctionToggle.textContent = state.auctionHidden ? 'Show Auction' : 'Hide Auction';
     auctionToggle.setAttribute('aria-pressed', String(state.auctionHidden));
     auctionToggle.setAttribute('aria-label',
-        state.auctionHidden ? 'Show the auction panel' : 'Hide the auction panel');
+        state.auctionHidden ? 'Show the auction and explanations' : 'Hide the auction and explanations');
 }
 
 try {

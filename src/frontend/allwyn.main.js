@@ -24,30 +24,30 @@ initTheme(document.querySelector('#theme-toggle'));
 /* Show/hide the auction panel - the calls, trick count and claim controls.
    Labelled with what clicking it does, as the theme button is, and remembered
    between deals. */
-const biddingToggle = document.querySelector('#bidding-toggle');
+const auctionToggle = document.querySelector('#auction-toggle');
 const AUCTION_KEY = 'allwyn.auctionHidden';
 
-function paintBiddingToggle() {
-    if (!biddingToggle) return;
-    biddingToggle.textContent = state.auctionHidden ? 'Show bidding' : 'Hide bidding';
-    biddingToggle.setAttribute('aria-pressed', String(state.auctionHidden));
-    biddingToggle.setAttribute('aria-label',
+function paintAuctionToggle() {
+    if (!auctionToggle) return;
+    auctionToggle.textContent = state.auctionHidden ? 'Show Auction' : 'Hide Auction';
+    auctionToggle.setAttribute('aria-pressed', String(state.auctionHidden));
+    auctionToggle.setAttribute('aria-label',
         state.auctionHidden ? 'Show the auction panel' : 'Hide the auction panel');
 }
 
 try {
     state.auctionHidden = localStorage.getItem(AUCTION_KEY) === '1';
 } catch (_) { /* private mode: start with it shown */ }
-paintBiddingToggle();
+paintAuctionToggle();
 
-biddingToggle?.addEventListener('click', (event) => {
+auctionToggle?.addEventListener('click', (event) => {
     event.stopPropagation();          // don't also acknowledge a finished trick
     state.auctionHidden = !state.auctionHidden;
     try {
         if (state.auctionHidden) localStorage.setItem(AUCTION_KEY, '1');
         else localStorage.removeItem(AUCTION_KEY);
     } catch (_) { /* nothing to remember it with */ }
-    paintBiddingToggle();
+    paintAuctionToggle();
     state.notify();
 });
 

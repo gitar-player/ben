@@ -592,13 +592,27 @@ def frontend(filename):
         filename = filename[:filename.index('?')]
 
     file_path = os.path.join(script_dir, '')    
-    return static_file(filename, root=file_path)
+    served = static_file(filename, root=file_path)
+    # Without Cache-Control a browser applies heuristic freshness and may reuse
+    # a stale copy without asking, which shows up as an edited page half
+    # updating: new HTML with the previous JavaScript still running behind it.
+    # "no-cache" means revalidate every time - with the ETag already sent that
+    # is a 304 and no body, so it costs almost nothing on a local server.
+    served.set_header('Cache-Control', 'no-cache')
+    return served
 
 @app.route('/favicon.ico')
 def frontend():
     filename = 'favicon.ico'
     file_path = os.path.join(script_dir, '')    
-    return static_file(filename, root=file_path)
+    served = static_file(filename, root=file_path)
+    # Without Cache-Control a browser applies heuristic freshness and may reuse
+    # a stale copy without asking, which shows up as an edited page half
+    # updating: new HTML with the previous JavaScript still running behind it.
+    # "no-cache" means revalidate every time - with the ETag already sent that
+    # is a 304 and no body, so it costs almost nothing on a local server.
+    served.set_header('Cache-Control', 'no-cache')
+    return served
 
 @app.route('/api')
 def index():

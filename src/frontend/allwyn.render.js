@@ -314,9 +314,8 @@ export function render(state, dom) {
 
     // Labelled, because a bare number in the corner of the felt reads as an
     // error code when the board happens to be numbered 404.
-    // The explanations go with the auction panel: they are the commentary on it.
     if (dom.auctionPanel) dom.auctionPanel.hidden = state.auctionHidden;
-    if (dom.explain) dom.explain.hidden = state.auctionHidden;
+    if (dom.explain) dom.explain.hidden = state.helpHidden;
     if (dom.boardNumber) {
         dom.boardNumber.textContent = state.deal.boardNo ? `Board ${state.deal.boardNo}` : '';
     }

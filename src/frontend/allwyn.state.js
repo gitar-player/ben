@@ -45,6 +45,8 @@ export class GameState {
         // calls, the trick count and the claim/concede controls. Nothing to do
         // with the bidding box, which comes and goes with the server's turn.
         this.auctionHidden = false;
+        // The explanations have their own control, independent of the auction.
+        this.helpHidden = false;
         this.busy = false;
 
         this.connection = { status: 'connecting', detail: '' };

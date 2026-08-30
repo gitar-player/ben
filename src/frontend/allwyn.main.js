@@ -21,8 +21,8 @@ let trickTimer = null;
 
 initTheme(document.querySelector('#theme-toggle'));
 
-/* Show/hide the auction panel - the calls, trick count and claim controls -
-   together with the bid explanations beneath it.
+/* Show/hide the auction panel on the felt. The explanations have their own
+   button below.
    Labelled with what clicking it does, as the theme button is, and remembered
    between deals. */
 const auctionToggle = document.querySelector('#auction-toggle');
@@ -33,7 +33,7 @@ function paintAuctionToggle() {
     auctionToggle.textContent = state.auctionHidden ? 'Show Auction' : 'Hide Auction';
     auctionToggle.setAttribute('aria-pressed', String(state.auctionHidden));
     auctionToggle.setAttribute('aria-label',
-        state.auctionHidden ? 'Show the auction and explanations' : 'Hide the auction and explanations');
+        state.auctionHidden ? 'Show the auction panel' : 'Hide the auction panel');
 }
 
 try {
@@ -49,6 +49,34 @@ auctionToggle?.addEventListener('click', (event) => {
         else localStorage.removeItem(AUCTION_KEY);
     } catch (_) { /* nothing to remember it with */ }
     paintAuctionToggle();
+    state.notify();
+});
+
+/* The same again for the bid explanations, on their own button. */
+const helpToggle = document.querySelector('#help-toggle');
+const HELP_KEY = 'allwyn.helpHidden';
+
+function paintHelpToggle() {
+    if (!helpToggle) return;
+    helpToggle.textContent = state.helpHidden ? 'Show Help' : 'Hide Help';
+    helpToggle.setAttribute('aria-pressed', String(state.helpHidden));
+    helpToggle.setAttribute('aria-label',
+        state.helpHidden ? 'Show the bid explanations' : 'Hide the bid explanations');
+}
+
+try {
+    state.helpHidden = localStorage.getItem(HELP_KEY) === '1';
+} catch (_) { /* private mode: start with it shown */ }
+paintHelpToggle();
+
+helpToggle?.addEventListener('click', (event) => {
+    event.stopPropagation();          // don't also acknowledge a finished trick
+    state.helpHidden = !state.helpHidden;
+    try {
+        if (state.helpHidden) localStorage.setItem(HELP_KEY, '1');
+        else localStorage.removeItem(HELP_KEY);
+    } catch (_) { /* nothing to remember it with */ }
+    paintHelpToggle();
     state.notify();
 });
 

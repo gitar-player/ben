@@ -47,6 +47,9 @@ export class GameState {
         this.auctionHidden = false;
         // The explanations have their own control, independent of the auction.
         this.helpHidden = false;
+        // Once the contract is settled the bidding box is done with, and the
+        // space it was holding can go back to the table.
+        this.auctionOver = false;
         this.busy = false;
 
         this.connection = { status: 'connecting', detail: '' };
@@ -86,6 +89,7 @@ export class GameState {
                 this.claimAvailable = false;
                 this.concedeAvailable = false;
                 this.revealed = new Set();
+                this.auctionOver = false;
                 break;
             }
 
@@ -124,6 +128,7 @@ export class GameState {
                 this.deal.turn = (message.declarer + 1) % 4;
                 this.deal.currentTrick = new Trick(this.deal.turn, []);
                 this.expectBidInput = false;
+                this.auctionOver = true;
                 this.busy = true;
                 break;
             }

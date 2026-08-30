@@ -209,6 +209,22 @@ check('a hand stays visible once it has been shown', () => {
     assert.equal(state.revealed.has(1), false, 'an opponent hand is not revealed');
 });
 
+check('the bidding box keeps its space until the contract is settled', () => {
+    const state = new GameState(defaultOptions);
+    state.apply({ message: 'deal_start', dealer: 0, vuln: [false, false], hand: ['AK...', '', '', ''], board_no: 1 });
+    assert.equal(state.auctionOver, false, 'space held during the auction');
+
+    state.apply({ message: 'get_bid_input', auction: ['1C'] });
+    assert.equal(state.auctionOver, false, 'still held between turns');
+
+    state.apply({ message: 'auction_end', auction: ['1N', 'PASS', 'PASS', 'PASS'], declarer: 0, strain: 0 });
+    assert.equal(state.auctionOver, true, 'released once the auction ends');
+
+    // and held again on the next deal
+    state.apply({ message: 'deal_start', dealer: 0, vuln: [false, false], hand: ['AK...', '', '', ''], board_no: 2 });
+    assert.equal(state.auctionOver, false);
+});
+
 check('canPlay refuses a card that is not on turn or not legal', () => {
     const state = new GameState({ ...defaultOptions, humanSeats: [false, false, true, false], noHuman: false });
     state.apply({ message: 'deal_start', dealer: 0, vuln: [false, false], hand: ['', '', 'AK.QJ.T9.8765', ''], board_no: 1 });

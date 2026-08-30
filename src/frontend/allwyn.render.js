@@ -173,6 +173,9 @@ function renderAuction(state, dom) {
 
 function renderBiddingBox(state, dom) {
     clear(dom.bidding);
+    // Reserved through the auction so the box appearing and disappearing between
+    // turns does not shift the table; released once the contract is settled.
+    dom.bidding?.classList.toggle('done', state.auctionOver);
     if (!state.expectBidInput) return;
 
     const auction = state.deal.auctionModel;

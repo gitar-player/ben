@@ -71,6 +71,10 @@
     --side-hand-w: 13rem;
     --table-h: 21.5rem;
     --biddingbox-h: 7rem;
+    /* The clear middle of the felt, which the auction panel occupies and the
+       trick diamond forms around. */
+    --auction-w: 13.5rem;
+    --auction-h: 8rem;
 }
 
 /*
@@ -307,6 +311,40 @@ a:hover { text-decoration: underline; }
     padding: var(--space-3);
 }
 
+/* On the cloth: dark enough to read against the green, small enough to leave
+   the trick diamond room, and behind the cards when they land. */
+#auction-main {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    translate: -50% -50%;
+    z-index: 1;
+    width: var(--auction-w);
+    max-height: var(--auction-h);
+    overflow-y: auto;
+    padding: var(--space-2);
+    background: rgb(6 20 12 / 62%);
+    border-color: rgb(255 255 255 / 14%);
+    backdrop-filter: blur(3px);
+    box-shadow: var(--shadow);
+}
+#auction-main #auction table { font-size: 0.85rem; }
+#auction-main #auction th {
+    padding: 2px 5px;
+    font-size: 0.68rem;
+    position: sticky;               /* stays put while a long auction scrolls */
+    top: 0;
+    background: rgb(6 20 12 / 94%);
+}
+#auction-main #auction td { padding: 2px 5px; }
+#auction-main .tricks { margin-top: var(--space-2); padding: 4px var(--space-2); font-size: 0.85rem; }
+#auction-main .actions:empty { display: none; }
+#auction-main #last-trick, #auction-main #claim, #auction-main #conceed {
+    margin-top: var(--space-1);
+    padding: 3px 8px;
+    font-size: 0.85rem;
+}
+
 /* Hands: no chrome, they sit on the page next to the felt. */
 .hand {
     display: flex;
@@ -346,6 +384,7 @@ a:hover { text-decoration: underline; }
     padding: var(--space-3);
     /* Fixed both ways: the felt is the same size all game, whatever the hands
        beside it are doing. */
+    position: relative;
     width: var(--table-w);
     height: var(--table-h);
     margin-inline: auto;
@@ -356,10 +395,11 @@ a:hover { text-decoration: underline; }
  * cards form a diamond just inside them, so a trick reads as a trick rather
  * than four cards stacked on the labels.
  */
+#table-container { position: absolute; inset: var(--space-3); }
 #table-container {
     display: grid;
-    grid-template-columns: auto 1fr auto 1fr auto;
-    grid-template-rows: auto 1fr auto 1fr auto;
+    grid-template-columns: auto 1fr var(--auction-w) 1fr auto;
+    grid-template-rows: auto 1fr var(--auction-h) 1fr auto;
     grid-template-areas:
         ".     .      lnorth .     num"
         ".     .      tnorth .     ."
@@ -383,7 +423,7 @@ a:hover { text-decoration: underline; }
 .trick-north, .trick-south, .trick-east, .trick-west {
     align-self: center;
     justify-self: center;
-    z-index: 2;
+    z-index: 3;                  /* played cards sit over the auction */
 }
 
 .table-grid-item { display: flex; justify-content: center; align-items: center; }

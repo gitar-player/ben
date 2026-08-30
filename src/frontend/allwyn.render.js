@@ -164,6 +164,11 @@ function renderAuction(state, dom) {
     table.appendChild(body);
     wrapper.appendChild(table);
     dom.auction.appendChild(wrapper);
+
+    // The panel is only as tall as the clear middle of the felt, so a long
+    // auction scrolls - keep the most recent calls in view.
+    const panel = dom.auctionPanel;
+    if (panel) panel.scrollTop = panel.scrollHeight;
 }
 
 function renderBiddingBox(state, dom) {

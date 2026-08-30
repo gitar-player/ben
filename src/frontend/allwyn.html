@@ -53,6 +53,19 @@
                     <div class="table-grid-item trick-south"></div>
                     <div class="table-grid-item label-south"><span class="seat-label">S</span></div>
                 </div>
+
+                <!-- The auction sits on the cloth; played cards layer above it. -->
+                <section id="auction-main" class="panel" aria-label="Auction">
+                    <div id="auction-container"></div>
+                    <div class="tricks">Tricks</div>
+                    <div class="actions">
+                        <div id="last-trick" hidden>Show last trick</div>
+                        <div id="claim" hidden>Claim
+                            <div id="claim-tricks"></div>
+                        </div>
+                        <div id="conceed" hidden>Concede</div>
+                    </div>
+                </section>
             </section>
 
             <div id="east" class="hand" aria-label="East hand"></div>
@@ -62,18 +75,6 @@
         <div id="bidding" aria-label="Bidding box"></div>
 
         <aside id="sidebar">
-            <section id="auction-main" class="panel" aria-label="Auction">
-                <div id="auction-container"></div>
-                <div class="tricks">Tricks</div>
-                <div class="actions">
-                    <div id="last-trick" hidden>Show last trick</div>
-                    <div id="claim" hidden>Claim
-                        <div id="claim-tricks"></div>
-                    </div>
-                    <div id="conceed" hidden>Concede</div>
-                </div>
-            </section>
-
             <div id="explain" class="explain" aria-label="Bidding explanations"></div>
         </aside>
     </main>

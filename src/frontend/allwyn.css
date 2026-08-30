@@ -65,7 +65,7 @@
        box is the same size empty as it is full. */
     --hand-h: calc(var(--card-h) * 4 + 14px);
     --hand-row-h: calc(var(--card-h) + 12px);  /* North/South: suits side by side */
-    --table-w: 32.5rem;
+    --table-w: 35.5rem;
     /* Wide enough for an eight-card suit at the current overlap, so East and
        West keep one width from deal to last trick. */
     --side-hand-w: 13rem;
@@ -450,14 +450,14 @@ a:hover { text-decoration: underline; }
 .seat-label {
     display: grid;
     place-items: center;
-    min-width: 26px;
-    height: 26px;
+    min-width: 34px;
+    height: 34px;
     padding: 0 var(--space-2);
     border-radius: 999px;
     background: var(--bg-sunken);
     border: 1px solid var(--border);
     color: var(--text-muted);
-    font-size: 0.9rem;
+    font-size: 1.15rem;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     transition: background var(--speed), color var(--speed), box-shadow var(--speed);
@@ -479,10 +479,10 @@ a:hover { text-decoration: underline; }
 .label-number, .label-number .seat-label {
     background: none;
     border: none;
-    color: rgb(255 255 255 / 55%);
+    color: rgb(255 255 255 / 68%);
     font-family: var(--font);
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 1rem;
+    font-weight: 700;
     letter-spacing: 0.02em;
     white-space: nowrap;
 }
@@ -583,9 +583,9 @@ a:hover { text-decoration: underline; }
     top: var(--space-3);
     left: var(--space-3);
     z-index: 2;
-    color: rgb(255 255 255 / 55%);
-    font-size: 0.8rem;
-    font-weight: 600;
+    color: rgb(255 255 255 / 68%);
+    font-size: 1rem;
+    font-weight: 700;
     letter-spacing: 0.02em;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

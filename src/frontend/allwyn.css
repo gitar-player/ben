@@ -421,7 +421,7 @@ a:hover { text-decoration: underline; }
     grid-template-columns: auto 1fr var(--auction-w) 1fr auto;
     grid-template-rows: auto 1fr var(--auction-h) 1fr auto;
     grid-template-areas:
-        ".     .      lnorth .     num"
+        ".     .      lnorth .     ."
         ".     .      tnorth .     ."
         "lwest twest  .      teast least"
         ".     .      tsouth .     ."
@@ -433,7 +433,12 @@ a:hover { text-decoration: underline; }
 .label-south  { grid-area: lsouth; }
 .label-east   { grid-area: least; }
 .label-west   { grid-area: lwest; }
-.label-number { grid-area: num; align-self: start; justify-self: end; }
+.label-number {
+    position: absolute;      /* out of the grid, mirroring .tricks opposite */
+    top: 0;
+    right: 0;
+    z-index: 2;
+}
 
 .trick-north { grid-area: tnorth; }
 .trick-south { grid-area: tsouth; }

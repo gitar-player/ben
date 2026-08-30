@@ -639,8 +639,22 @@ a:hover { text-decoration: underline; }
     line-height: 1.5;
 }
 #explain:empty { display: none; }
-#explain div { padding: 4px 0; border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent); }
-#explain div:last-child { border-bottom: none; }
+#explain table { width: 100%; border-collapse: collapse; }
+#explain td {
+    padding: 5px 0;
+    vertical-align: top;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+}
+#explain tr:last-child td { border-bottom: none; }
+/* The call column is as narrow as its widest call; the meaning takes the rest. */
+#explain td.call {
+    width: 1%;
+    white-space: nowrap;
+    padding-right: var(--space-3);
+    font-weight: 700;
+    color: var(--text);
+}
+#explain td.meaning { color: var(--text-muted); }
 /* Suit pips wherever engine text is shown: explanations and the hint dialog. */
 .suit { font-size: 1.05em; line-height: 1; }
 .suit.red { color: var(--red); }

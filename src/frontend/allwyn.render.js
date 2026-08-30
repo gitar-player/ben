@@ -290,15 +290,30 @@ export function appendCall(parent, call) {
 
 function renderExplanations(state, dom) {
     clear(dom.explain);
+    if (state.explanations.length === 0) return;
+
+    // Two columns: the call, then what it showed. The state already holds the
+    // two halves separately, so nothing has to be split back apart on the "=".
+    const table = document.createElement('table');
+    const body = document.createElement('tbody');
+
     for (const { call, text } of state.explanations) {
-        const line = document.createElement('div');
-        appendCall(line, call);
-        if (text) {
-            line.appendChild(document.createTextNode(' = '));
-            appendSuitText(line, text);
-        }
-        dom.explain.appendChild(line);
+        const row = document.createElement('tr');
+
+        const callCell = document.createElement('td');
+        callCell.className = 'call';
+        appendCall(callCell, call);
+        row.appendChild(callCell);
+
+        const meaningCell = document.createElement('td');
+        meaningCell.className = 'meaning';
+        appendSuitText(meaningCell, text ?? '');
+        row.appendChild(meaningCell);
+
+        body.appendChild(row);
     }
+    table.appendChild(body);
+    dom.explain.appendChild(table);
 }
 
 function renderStatus(state, dom) {

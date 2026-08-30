@@ -726,15 +726,33 @@ a:hover { text-decoration: underline; }
     color: #fff;
 }
 #bidding-box .invalid {
-    opacity: 0.28;
+    opacity: 0.35;
     cursor: not-allowed;
     pointer-events: none;
 }
-#bidding-suits .red { color: var(--red); }
+#bidding-suits .red { color: var(--card-red); }
 /* Dimmed rather than absent before a level is chosen, so the two-step bid is
    visible. Lighter than .invalid, which means "illegal call". */
-#bidding-suits.awaiting-level div { opacity: 0.45; }
-#bidding-suits div { font-size: 1.2rem; }
+#bidding-suits.awaiting-level div { opacity: 0.55; }
+/*
+ * The strains read as little card faces: a card-coloured tile with a black or
+ * red pip, in both themes. Far more contrast than a coloured glyph on the same
+ * grey as the level buttons, and it matches the pips on the cards in hand.
+ */
+#bidding-suits div {
+    background: var(--card-bg);
+    border-color: rgb(0 0 0 / 30%);
+    color: var(--card-ink);
+    font-size: 1.4rem;
+    min-width: 38px;
+    box-shadow: var(--shadow-sm);
+}
+#bidding-suits .bid-nt { font-size: 1rem; font-weight: 800; }
+#bidding-suits div:hover {
+    background: var(--card-bg);
+    border-color: var(--accent);
+    box-shadow: var(--shadow);
+}
 #bidding-calls .pass { color: var(--green); }
 #bidding-calls .double, #bidding-calls .redouble { color: var(--red); }
 #bidding-calls .hint { color: var(--accent); }

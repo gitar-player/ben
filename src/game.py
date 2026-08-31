@@ -485,6 +485,21 @@ class Driver:
             result['claimedbydeclarer'] = self.claimedbydeclarer
         if self.conceed is not None:
             result['conceed'] = self.conceed
+
+        # Score the deal with scoring.score, the same call the PBN export makes,
+        # and report it from North-South's side as elsewhere in this file: a
+        # positive score is North-South's, a negative one East-West's.
+        #
+        # Only for a deal that was played out. An accepted claim returns from
+        # play() before tricks_taken is set, so it is still 0 there and any
+        # score computed from it would be wrong.
+        if self.contract is not None and self.claimed is None and not self.conceed:
+            declarer_is_ns = self.contract[-1] in ('N', 'S')
+            declarer_vuln = self.vuln_ns if declarer_is_ns else self.vuln_ew
+            declarer_score = scoring.score(self.contract, declarer_vuln, self.tricks_taken)
+            result['tricks_taken'] = self.tricks_taken
+            result['score'] = declarer_score if declarer_is_ns else -declarer_score
+
         return result
 
 # trick_i : 

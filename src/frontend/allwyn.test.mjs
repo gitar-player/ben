@@ -12,7 +12,7 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { Card, Hand, Trick, Auction, parseHand, vulnerabilityLabel, parseContract, contractOutcome } from './allwyn.model.js';
+import { Card, Hand, Trick, Auction, parseHand, vulnerabilityLabel, parseContract, contractOutcome, scoreLine } from './allwyn.model.js';
 import { parseMessage, ProtocolError } from './allwyn.protocol.js';
 import { GameState } from './allwyn.state.js';
 
@@ -123,6 +123,14 @@ check('the outcome counts against the book', () => {
     assert.equal(contractOutcome(4, 12), 'made +2');
     assert.equal(contractOutcome(3, 7), 'down 2');
     assert.equal(contractOutcome(7, 13), 'made exactly');
+});
+
+check('a score reads out to whichever side won it', () => {
+    assert.equal(scoreLine(620), 'N-S +620');
+    assert.equal(scoreLine(-100), 'E-W +100');
+    assert.equal(scoreLine(0), 'No score');
+    assert.equal(scoreLine(null), null, 'nothing to show');
+    assert.equal(scoreLine(undefined), null);
 });
 
 /* ---------------------------------------------------------------- protocol */
@@ -265,6 +273,20 @@ check('deal_end works out the result and waits', () => {
     assert.equal(state.result.declarer, 'S');
     assert.equal(state.result.tricks, 11, 'counts declarer\'s side');
     assert.equal(state.result.outcome, 'made +1');
+    assert.equal(state.result.score, null, 'no score sent, none shown');
+
+    // with the server's score and trick count, both are used
+    const scored = new GameState(defaultOptions);
+    scored.apply({ message: 'deal_start', dealer: 0, vuln: [true, false], hand: ['AK...', '', '', ''], board_no: 3 });
+    scored.apply({ message: 'auction_end', auction: [], declarer: 2, strain: 3 });
+    scored.apply({
+        message: 'deal_end',
+        pbn: 'AK.QJ.T9.8765 AK.QJ.T9.8765 AK.QJ.T9.8765 AK.QJ.T9.8765',
+        dict: { contract: '4HS', score: 650, tricks_taken: 11 },
+    });
+    assert.equal(scored.result.score, 650);
+    assert.equal(scored.result.tricks, 11, 'the count the score was worked out from');
+    assert.equal(scored.result.outcome, 'made +1');
 
     // a passed-out deal still reports something
     const passed = new GameState(defaultOptions);

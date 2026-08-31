@@ -43,6 +43,16 @@ export function contractOutcome(level, tricksByDeclarer) {
     return `down ${-difference}`;
 }
 
+/**
+ * Read a North-South-relative score the way a scoresheet does: whichever side
+ * the points went to, and how many. Null when there is no score to show.
+ */
+export function scoreLine(score) {
+    if (!Number.isFinite(score)) return null;
+    if (score === 0) return 'No score';
+    return score > 0 ? `N-S +${score}` : `E-W +${-score}`;
+}
+
 /** A single card. `suit` is an index into SUITS, `value` orders A(0) to 2(12). */
 export class Card {
     constructor(symbol) {

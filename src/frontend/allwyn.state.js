@@ -226,13 +226,23 @@ export class GameState {
                 if (contract) {
                     const seat = 'NESW'.indexOf(contract.declarer);
                     const tricks = this.deal.tricksCount[seat % 2];
+                    // The server scores a deal it played out, with
+                    // scoring.score, from North-South's side. It sends no score
+                    // for a claimed or conceded deal, where its trick count is
+                    // not reliable - so the panel simply omits it there.
+                    const scored = Number.isFinite(message.dict?.score);
+                    const played = Number.isFinite(message.dict?.tricks_taken)
+                        ? message.dict.tricks_taken
+                        : tricks;
+
                     this.result = {
                         ...contract,
                         declarerSeat: seat,
-                        tricks,
-                        outcome: contractOutcome(contract.level, tricks),
+                        tricks: played,
+                        outcome: contractOutcome(contract.level, played),
                         conceded: Boolean(message.dict?.conceed),
                         claimed: Boolean(message.dict?.claimed),
+                        score: scored ? message.dict.score : null,
                     };
                 } else {
                     this.result = { passedOut: true };

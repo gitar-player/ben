@@ -531,6 +531,17 @@ a:hover { text-decoration: underline; }
 }
 .result-contract .suit { font-size: 1.5rem; }
 .result-outcome { font-size: 1rem; font-weight: 600; color: rgb(255 255 255 / 75%); }
+.result-score {
+    margin-top: var(--space-1);
+    padding: 3px 12px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 12%);
+    border: 1px solid rgb(255 255 255 / 22%);
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+}
 .result .btn { margin-top: var(--space-1); }
 
 /* Vulnerability summary, under the board number. */

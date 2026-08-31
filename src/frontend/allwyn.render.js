@@ -7,7 +7,7 @@
  * element ids and class names match style.css, which is shared with bridge.html.
  */
 
-import { SEATS, vulnerabilityLabel } from './allwyn.model.js';
+import { SEATS, vulnerabilityLabel, scoreLine } from './allwyn.model.js';
 
 const SUIT_ENTITIES = ['♠', '♥', '♦', '♣']; // S H D C
 const SEAT_LABELS = ['.label-north', '.label-east', '.label-south', '.label-west'];
@@ -25,6 +25,7 @@ export function collectDom(root = document) {
         result: $('#result'),
         resultContract: $('#result-contract'),
         resultOutcome: $('#result-outcome'),
+        resultScore: $('#result-score'),
         auction: $('#auction-container'),
         auctionPanel: $('#auction-main'),
         bidding: $('#bidding'),
@@ -302,6 +303,8 @@ function renderResult(state, dom) {
     clear(dom.resultContract);
     clear(dom.resultOutcome);
 
+    if (dom.resultScore) dom.resultScore.hidden = true;
+
     if (state.result.passedOut) {
         dom.resultContract.textContent = 'Passed out';
         dom.resultOutcome.textContent = 'No contract';
@@ -317,6 +320,12 @@ function renderResult(state, dom) {
 
     const note = conceded ? ' (conceded)' : claimed ? ' (claimed)' : '';
     dom.resultOutcome.textContent = `${tricks} tricks - ${outcome}${note}`;
+
+    const line = scoreLine(state.result.score);
+    if (dom.resultScore) {
+        dom.resultScore.textContent = line ?? '';
+        dom.resultScore.hidden = !line;
+    }
 }
 
 function renderExplanations(state, dom) {

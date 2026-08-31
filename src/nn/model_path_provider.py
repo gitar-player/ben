@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys
 import tempfile
 import atexit
 from typing import List, Optional
@@ -28,6 +29,14 @@ def find_best_temp_drive(
                        (e.g., "D:\\app_isolated_temp"), or None if no suitable
                        preferred drive is found (caller should use system default).
     """
+    # Drive letters are a Windows idea: off Windows none of D:\, F:\ or C:\
+    # exists, the scan below always fails, and it used to report that failure at
+    # error level on every single run. Falling back to the system temporary
+    # directory is the correct outcome there, not a problem worth reporting.
+    if sys.platform != 'win32':
+        logging.debug("Not Windows: using the system temporary directory for models.")
+        return None
+
     best_drive_path = None
     max_free_space = -1
     chosen_drive_letter = None

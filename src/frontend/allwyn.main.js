@@ -18,6 +18,14 @@ const dom = collectDom();
 const state = new GameState(options);
 
 let trickTimer = null;
+let pendingDealRecord = null;
+
+document.querySelector('#result-continue')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    state.result = null;                 // take the summary off the felt
+    state.notify();
+    openFeedbackDialog(pendingDealRecord);
+});
 
 initTheme(document.querySelector('#theme-toggle'));
 
@@ -109,8 +117,13 @@ function handle(message) {
                 clearTimeout(trickTimer);
                 trickTimer = setTimeout(confirmTrick, Math.max(0, effect.seconds) * 1000);
                 break;
+            case 'score-needed':
+                fetchScore(effect);
+                break;
             case 'deal-end':
-                openFeedbackDialog(effect.dict);
+                // Show the result and stop there. The feedback dialog, and the
+                // navigation that follows it, wait for the player to continue.
+                pendingDealRecord = effect.dict;
                 break;
         }
     }
@@ -163,6 +176,30 @@ function showHint(bids) {
         body.appendChild(list);
     }
     dialog.showModal();
+}
+
+/**
+ * Score a claimed or conceded deal through the server, which has scoring.py.
+ * Failure is quiet: the result panel simply shows no score, which is what it
+ * would have shown anyway.
+ */
+async function fetchScore({ contract, vulnerable, tricks }) {
+    try {
+        const query = new URLSearchParams({
+            contract,
+            vul: vulnerable ? '1' : '0',
+            tricks: String(tricks),
+        });
+        const response = await fetch(`/api/score?${query}`);
+        if (!response.ok) throw new Error(`server said ${response.status}`);
+        const data = await response.json();
+        if (state.result && Number.isFinite(data.score)) {
+            state.result.score = data.score;
+            state.notify();
+        }
+    } catch (error) {
+        console.warn('Could not score the claimed deal:', error);
+    }
 }
 
 /* ------------------------------------------------------------ user actions */

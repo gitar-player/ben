@@ -295,6 +295,62 @@ check('deal_end works out the result and waits', () => {
     assert.equal(passed.result.passedOut, true);
 });
 
+check('a claim credits the right side, and asks for a score', () => {
+    // 4H by South. Five tricks played, N-S have 4 of them; declarer claims the
+    // remaining 8, so South's side finishes with 12.
+    const state = new GameState(defaultOptions);
+    state.apply({ message: 'deal_start', dealer: 0, vuln: [true, false], hand: ['AK...', '', '', ''], board_no: 1 });
+    state.apply({ message: 'auction_end', auction: [], declarer: 2, strain: 3 });
+    state.deal.tricks = Array.from({ length: 5 }, () => new Trick(0, []));
+    state.deal.tricksCount = [4, 1];
+
+    const effects = state.apply({
+        message: 'deal_end',
+        pbn: 'AK.QJ.T9.8765 AK.QJ.T9.8765 AK.QJ.T9.8765 AK.QJ.T9.8765',
+        dict: { contract: '4HS', claimed: 8, claimedbydeclarer: true },
+    });
+
+    assert.deepEqual(state.deal.tricksCount, [12, 1], 'the other side keeps what it won');
+    assert.equal(state.result.tricks, 12);
+    assert.equal(state.result.outcome, 'made +2');
+    assert.equal(state.result.score, null, 'the server sent none');
+
+    const ask = effects.find((e) => e.type === 'score-needed');
+    assert.ok(ask, 'a score is requested');
+    assert.equal(ask.contract, '4HS');
+    assert.equal(ask.tricks, 12);
+    assert.equal(ask.vulnerable, true, "declarer's side is vulnerable");
+});
+
+check('a claim by the defenders gives declarer the rest', () => {
+    const state = new GameState(defaultOptions);
+    state.apply({ message: 'deal_start', dealer: 0, vuln: [false, false], hand: ['AK...', '', '', ''], board_no: 1 });
+    state.apply({ message: 'auction_end', auction: [], declarer: 2, strain: 3 });
+    state.deal.tricks = Array.from({ length: 9 }, () => new Trick(0, []));
+    state.deal.tricksCount = [6, 3];
+
+    // 4 tricks left, defenders claim 3, so declarer takes the remaining 1.
+    state.apply({
+        message: 'deal_end',
+        pbn: 'AK.QJ.T9.8765 AK.QJ.T9.8765 AK.QJ.T9.8765 AK.QJ.T9.8765',
+        dict: { contract: '4HS', claimed: 3, claimedbydeclarer: false },
+    });
+    assert.deepEqual(state.deal.tricksCount, [7, 6]);
+    assert.equal(state.result.outcome, 'down 3');
+});
+
+check('a deal the server scored does not ask again', () => {
+    const state = new GameState(defaultOptions);
+    state.apply({ message: 'deal_start', dealer: 0, vuln: [false, false], hand: ['AK...', '', '', ''], board_no: 1 });
+    state.apply({ message: 'auction_end', auction: [], declarer: 2, strain: 3 });
+    const effects = state.apply({
+        message: 'deal_end',
+        pbn: 'AK.QJ.T9.8765 AK.QJ.T9.8765 AK.QJ.T9.8765 AK.QJ.T9.8765',
+        dict: { contract: '4HS', score: 620, tricks_taken: 10 },
+    });
+    assert.equal(effects.some((e) => e.type === 'score-needed'), false);
+});
+
 check('canPlay refuses a card that is not on turn or not legal', () => {
     const state = new GameState({ ...defaultOptions, humanSeats: [false, false, true, false], noHuman: false });
     state.apply({ message: 'deal_start', dealer: 0, vuln: [false, false], hand: ['', '', 'AK.QJ.T9.8765', ''], board_no: 1 });

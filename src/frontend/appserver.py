@@ -26,6 +26,11 @@ from functools import wraps
 app = Bottle()
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
+# src/ is the parent of src/frontend; scoring lives there.
+if os.path.dirname(script_dir) not in sys.path:
+    sys.path.insert(0, os.path.dirname(script_dir))
+import scoring
+
 # Which page the "play" links point at. "bridge" is the original UI; "allwyn" is
 # the rewritten one (ES modules, no jQuery, native dialogs). Both speak the same
 # websocket protocol and share style.css, so the choice is only about markup and
@@ -629,6 +634,43 @@ def index():
 @app.route('/autoplay')
 def autoplay_page():
     return template('autoplay.tpl')
+
+@app.route('/api/score')
+def score_deal():
+    """Score a contract with src/scoring.py.
+
+    Only needed for a claimed or conceded deal: game.py leaves the score out of
+    the deal record there, because an accepted claim returns from play() before
+    tricks_taken is assigned and the count it would score from is still 0. The
+    browser knows the real trick count, so it asks here rather than
+    reimplementing the scoring table in JavaScript. Remove once the engine
+    scores a claimed deal itself.
+
+    /api/score?contract=4HS&vul=1&tricks=11 -> {"score": 650, ...}
+    where score is from North-South's side, as game.py reports it.
+    """
+    contract = (request.query.get('contract') or '').upper()
+    if not re.match(r'^[1-7][CDHSN](XX|X)?[NESW]$', contract):
+        raise HTTPError(400, 'contract must look like 4HS, 3NN or 7SXXW')
+    try:
+        tricks = int(request.query.get('tricks', ''))
+        vulnerable = request.query.get('vul', '0') in ('1', 'true', 'True')
+    except ValueError:
+        raise HTTPError(400, 'tricks must be a number')
+    if not 0 <= tricks <= 13:
+        raise HTTPError(400, 'tricks must be between 0 and 13')
+
+    declarer_score = scoring.score(contract, vulnerable, tricks)
+    declarer_is_ns = contract[-1] in ('N', 'S')
+
+    response.content_type = 'application/json'
+    return json.dumps({
+        'contract': contract,
+        'tricks': tricks,
+        'vulnerable': vulnerable,
+        'declarer_score': declarer_score,
+        'score': declarer_score if declarer_is_ns else -declarer_score,
+    })
 
 @app.route('/api/deals/<deal_id>')
 def deal_data(deal_id):

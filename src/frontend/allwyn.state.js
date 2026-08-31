@@ -212,13 +212,20 @@ export class GameState {
                     this.deal.hands[seat].isPublic = true;
                 }
 
+                // A claim says how many of the REMAINING tricks the claiming
+                // side takes, so credit them to the right side and give the
+                // rest to the other. Note 0 is a real value - a concession -
+                // so this tests for a number, not for truthiness.
                 const claimed = message.dict?.claimed;
-                if (claimed) {
-                    const side = this.deal.tricks.length > 0
-                        ? this.deal.tricks[this.deal.tricks.length - 1].winner(this.deal.strain) % 2
-                        : 0;
-                    this.deal.tricksCount[side] += claimed;
-                    this.deal.tricksCount[(side + 1) % 2] = 13 - this.deal.tricksCount[side];
+                if (Number.isFinite(claimed) && this.deal.declarer !== undefined) {
+                    const declarerSide = this.deal.declarer % 2;
+                    const remaining = 13 - this.deal.tricks.length;
+                    const byDeclarer = Boolean(message.dict?.claimedbydeclarer);
+                    const declarerTricks = this.deal.tricksCount[declarerSide]
+                        + (byDeclarer ? claimed : remaining - claimed);
+
+                    this.deal.tricksCount[declarerSide] = declarerTricks;
+                    this.deal.tricksCount[(declarerSide + 1) % 2] = 13 - declarerTricks;
                     effects.push({ type: 'claim-accepted' });
                 }
                 // Work the result out after any claimed tricks are counted.
@@ -246,6 +253,18 @@ export class GameState {
                     };
                 } else {
                     this.result = { passedOut: true };
+                }
+
+                // game.py sends no score for a claimed or conceded deal. Ask the
+                // server to score it from the count we do have, rather than
+                // reimplementing the scoring table here.
+                if (this.result && !this.result.passedOut && this.result.score === null) {
+                    effects.push({
+                        type: 'score-needed',
+                        contract: message.dict.contract,
+                        vulnerable: this.deal.vuln[this.result.declarerSeat % 2 === 0 ? 0 : 1],
+                        tricks: this.result.tricks,
+                    });
                 }
 
                 effects.push({ type: 'deal-end', dict: message.dict });

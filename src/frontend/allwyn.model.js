@@ -12,6 +12,19 @@ export const RANKS = 'AKQJT98765432';
 export const SEATS = ['north', 'east', 'south', 'west'];
 export const NORTH = 0, EAST = 1, SOUTH = 2, WEST = 3;
 
+/**
+ * How the deal is vulnerable, as the scoresheet writes it.
+ * @param {[boolean, boolean]} vuln [north-south, east-west], as deal_start sends
+ *   it and as the 'N E-W' half of a ?deal= parameter encodes it.
+ */
+export function vulnerabilityLabel(vuln = []) {
+    const [ns, ew] = vuln;
+    if (ns && ew) return 'Both';
+    if (ns) return 'N-S';
+    if (ew) return 'E-W';
+    return 'None';
+}
+
 /** A single card. `suit` is an index into SUITS, `value` orders A(0) to 2(12). */
 export class Card {
     constructor(symbol) {

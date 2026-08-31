@@ -7,7 +7,7 @@
  * element ids and class names match style.css, which is shared with bridge.html.
  */
 
-import { SEATS } from './allwyn.model.js';
+import { SEATS, vulnerabilityLabel } from './allwyn.model.js';
 
 const SUIT_ENTITIES = ['♠', '♥', '♦', '♣']; // S H D C
 const SEAT_LABELS = ['.label-north', '.label-east', '.label-south', '.label-west'];
@@ -21,6 +21,7 @@ export function collectDom(root = document) {
         trickSlots: SEATS.map((seat) => $(`.trick-${seat}`)),
         seatLabels: SEAT_LABELS.map((sel) => $(`${sel} .seat-label`)),
         boardNumber: $('.label-number'),
+        vuln: $('#vuln'),
         auction: $('#auction-container'),
         auctionPanel: $('#auction-main'),
         bidding: $('#bidding'),
@@ -334,6 +335,11 @@ export function render(state, dom) {
     // error code when the board happens to be numbered 404.
     if (dom.auctionPanel) dom.auctionPanel.hidden = state.auctionHidden;
     if (dom.explain) dom.explain.hidden = state.helpHidden;
+    if (dom.vuln) {
+        const label = vulnerabilityLabel(state.deal.vuln);
+        dom.vuln.textContent = `Vul ${label}`;
+        dom.vuln.dataset.vuln = label;          // styles the none/some distinction
+    }
     if (dom.boardNumber) {
         dom.boardNumber.textContent = state.deal.boardNo ? `Board ${state.deal.boardNo}` : '';
     }

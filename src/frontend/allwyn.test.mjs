@@ -12,7 +12,7 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { Card, Hand, Trick, Auction, parseHand } from './allwyn.model.js';
+import { Card, Hand, Trick, Auction, parseHand, vulnerabilityLabel } from './allwyn.model.js';
 import { parseMessage, ProtocolError } from './allwyn.protocol.js';
 import { GameState } from './allwyn.state.js';
 
@@ -100,6 +100,14 @@ check('strains below the last bid are closed off at that level', () => {
     const auction = new Auction(0, [false, false], ['1H']);
     assert.equal(auction.getMinBiddableSuitForLevel(1), 3, 'at the one level only spades and NT remain');
     assert.equal(auction.getMinBiddableSuitForLevel(2), 0, 'the two level is wide open');
+});
+
+check('vulnerability reads as None, N-S, E-W or Both', () => {
+    assert.equal(vulnerabilityLabel([false, false]), 'None');
+    assert.equal(vulnerabilityLabel([true, false]), 'N-S');
+    assert.equal(vulnerabilityLabel([false, true]), 'E-W');
+    assert.equal(vulnerabilityLabel([true, true]), 'Both');
+    assert.equal(vulnerabilityLabel(), 'None', 'missing vulnerability is not vulnerable');
 });
 
 /* ---------------------------------------------------------------- protocol */

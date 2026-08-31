@@ -467,7 +467,19 @@ a:hover { text-decoration: underline; }
     font-variant-numeric: tabular-nums;
     transition: background var(--speed), color var(--speed), box-shadow var(--speed);
 }
-.seat-label.red { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, var(--border)); }
+/* Vulnerable seats: a filled red pill, so the side at risk is obvious across
+   the table rather than a shade of the seat letter. */
+.seat-label.red {
+    color: #fff;
+    background: var(--card-red);
+    border-color: color-mix(in srgb, #fff 35%, var(--card-red));
+    box-shadow: 0 0 0 3px rgb(200 16 46 / 25%);
+}
+.seat-label.red.turn {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgb(200 16 46 / 55%);
+}
 .seat-label.dealer::after {
     content: "D";
     margin-left: 3px;
@@ -490,6 +502,27 @@ a:hover { text-decoration: underline; }
     font-weight: 700;
     letter-spacing: 0.02em;
     white-space: nowrap;
+}
+
+/* Vulnerability summary, under the board number. */
+.vuln {
+    position: absolute;
+    top: calc(var(--space-3) + 1.6rem);
+    right: var(--space-3);
+    z-index: 2;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    color: rgb(255 255 255 / 55%);
+    border: 1px solid rgb(255 255 255 / 18%);
+}
+.vuln:not([data-vuln="None"]) {
+    color: #fff;
+    background: var(--card-red);
+    border-color: color-mix(in srgb, #fff 30%, var(--card-red));
 }
 
 /* ------------------------------------------------------------------ cards */

@@ -25,6 +25,24 @@ export function vulnerabilityLabel(vuln = []) {
     return 'None';
 }
 
+/**
+ * Split the contract the server reports, e.g. "4HXS" -> 4 hearts doubled by
+ * South, "3NN" -> 3NT by North. Returns null for a passed-out deal.
+ */
+export function parseContract(contract) {
+    const m = /^([1-7])([CDHSN])(XX|X)?([NESW])$/.exec(contract ?? '');
+    if (!m) return null;
+    return { level: Number(m[1]), strain: m[2], doubling: m[3] ?? '', declarer: m[4] };
+}
+
+/** "made exactly", "made +2", "down 1" - from the tricks declarer took. */
+export function contractOutcome(level, tricksByDeclarer) {
+    const difference = tricksByDeclarer - (level + 6);
+    if (difference === 0) return 'made exactly';
+    if (difference > 0) return `made +${difference}`;
+    return `down ${-difference}`;
+}
+
 /** A single card. `suit` is an index into SUITS, `value` orders A(0) to 2(12). */
 export class Card {
     constructor(symbol) {

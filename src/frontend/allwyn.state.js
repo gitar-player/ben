@@ -12,7 +12,7 @@
  * caller renders once from state after every message.
  */
 
-import { Deal, Trick, Card, parseHand } from './allwyn.model.js';
+import { Deal, Trick, Card, parseHand, parseContract, contractOutcome } from './allwyn.model.js';
 
 export class GameState {
     constructor(options) {
@@ -50,6 +50,9 @@ export class GameState {
         // Once the contract is settled the bidding box is done with, and the
         // space it was holding can go back to the table.
         this.auctionOver = false;
+        // How the deal finished. Set at deal_end and shown until the player
+        // acknowledges it, so the final position is not whisked away.
+        this.result = null;
         this.busy = false;
 
         this.connection = { status: 'connecting', detail: '' };
@@ -90,6 +93,7 @@ export class GameState {
                 this.concedeAvailable = false;
                 this.revealed = new Set();
                 this.auctionOver = false;
+                this.result = null;
                 break;
             }
 
@@ -217,6 +221,23 @@ export class GameState {
                     this.deal.tricksCount[(side + 1) % 2] = 13 - this.deal.tricksCount[side];
                     effects.push({ type: 'claim-accepted' });
                 }
+                // Work the result out after any claimed tricks are counted.
+                const contract = parseContract(message.dict?.contract);
+                if (contract) {
+                    const seat = 'NESW'.indexOf(contract.declarer);
+                    const tricks = this.deal.tricksCount[seat % 2];
+                    this.result = {
+                        ...contract,
+                        declarerSeat: seat,
+                        tricks,
+                        outcome: contractOutcome(contract.level, tricks),
+                        conceded: Boolean(message.dict?.conceed),
+                        claimed: Boolean(message.dict?.claimed),
+                    };
+                } else {
+                    this.result = { passedOut: true };
+                }
+
                 effects.push({ type: 'deal-end', dict: message.dict });
                 break;
             }

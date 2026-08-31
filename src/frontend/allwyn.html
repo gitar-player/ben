@@ -68,6 +68,13 @@
                     <div id="conceed" hidden>Concede</div>
                 </div>
 
+                <!-- Shown when the deal finishes, until the player moves on. -->
+                <div id="result" class="result" role="status" hidden>
+                    <div id="result-contract" class="result-contract"></div>
+                    <div id="result-outcome" class="result-outcome"></div>
+                    <button type="button" class="btn btn-primary" id="result-continue">Continue</button>
+                </div>
+
                 <!-- The auction sits on the cloth; played cards layer above it. -->
                 <section id="auction-main" class="panel" aria-label="Auction">
                     <div id="auction-container"></div>

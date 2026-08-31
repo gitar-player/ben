@@ -12,7 +12,7 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { Card, Hand, Trick, Auction, parseHand, vulnerabilityLabel } from './allwyn.model.js';
+import { Card, Hand, Trick, Auction, parseHand, vulnerabilityLabel, parseContract, contractOutcome } from './allwyn.model.js';
 import { parseMessage, ProtocolError } from './allwyn.protocol.js';
 import { GameState } from './allwyn.state.js';
 
@@ -108,6 +108,21 @@ check('vulnerability reads as None, N-S, E-W or Both', () => {
     assert.equal(vulnerabilityLabel([false, true]), 'E-W');
     assert.equal(vulnerabilityLabel([true, true]), 'Both');
     assert.equal(vulnerabilityLabel(), 'None', 'missing vulnerability is not vulnerable');
+});
+
+check('the contract string splits into its parts', () => {
+    assert.deepEqual(parseContract('4HXS'), { level: 4, strain: 'H', doubling: 'X', declarer: 'S' });
+    assert.deepEqual(parseContract('3NN'), { level: 3, strain: 'N', doubling: '', declarer: 'N' });
+    assert.deepEqual(parseContract('7SXXW'), { level: 7, strain: 'S', doubling: 'XX', declarer: 'W' });
+    assert.equal(parseContract(null), null, 'passed out');
+    assert.equal(parseContract('PASS'), null);
+});
+
+check('the outcome counts against the book', () => {
+    assert.equal(contractOutcome(4, 10), 'made exactly');
+    assert.equal(contractOutcome(4, 12), 'made +2');
+    assert.equal(contractOutcome(3, 7), 'down 2');
+    assert.equal(contractOutcome(7, 13), 'made exactly');
 });
 
 /* ---------------------------------------------------------------- protocol */
@@ -231,6 +246,31 @@ check('the bidding box keeps its space until the contract is settled', () => {
     // and held again on the next deal
     state.apply({ message: 'deal_start', dealer: 0, vuln: [false, false], hand: ['AK...', '', '', ''], board_no: 2 });
     assert.equal(state.auctionOver, false);
+});
+
+check('deal_end works out the result and waits', () => {
+    const state = new GameState(defaultOptions);
+    state.apply({ message: 'deal_start', dealer: 0, vuln: [false, false], hand: ['AK...', '', '', ''], board_no: 1 });
+    state.apply({ message: 'auction_end', auction: ['4H', 'PASS', 'PASS', 'PASS'], declarer: 2, strain: 3 });
+    state.deal.tricksCount = [11, 2];        // South's side took 11
+
+    state.apply({
+        message: 'deal_end',
+        pbn: 'AK.QJ.T9.8765 AK.QJ.T9.8765 AK.QJ.T9.8765 AK.QJ.T9.8765',
+        dict: { contract: '4HS' },
+    });
+
+    assert.equal(state.result.level, 4);
+    assert.equal(state.result.strain, 'H');
+    assert.equal(state.result.declarer, 'S');
+    assert.equal(state.result.tricks, 11, 'counts declarer\'s side');
+    assert.equal(state.result.outcome, 'made +1');
+
+    // a passed-out deal still reports something
+    const passed = new GameState(defaultOptions);
+    passed.apply({ message: 'deal_start', dealer: 0, vuln: [false, false], hand: ['AK...', '', '', ''], board_no: 2 });
+    passed.apply({ message: 'deal_end', pbn: 'A. A. A. A.', dict: {} });
+    assert.equal(passed.result.passedOut, true);
 });
 
 check('canPlay refuses a card that is not on turn or not legal', () => {

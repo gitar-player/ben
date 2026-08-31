@@ -22,6 +22,9 @@ export function collectDom(root = document) {
         seatLabels: SEAT_LABELS.map((sel) => $(`${sel} .seat-label`)),
         boardNumber: $('.label-number'),
         vuln: $('#vuln'),
+        result: $('#result'),
+        resultContract: $('#result-contract'),
+        resultOutcome: $('#result-outcome'),
         auction: $('#auction-container'),
         auctionPanel: $('#auction-main'),
         bidding: $('#bidding'),
@@ -289,6 +292,33 @@ export function appendCall(parent, call) {
     }
 }
 
+/** The end-of-deal summary: contract, who played it, and how it went. */
+function renderResult(state, dom) {
+    if (!dom.result) return;
+    dom.result.hidden = !state.result;
+    if (!state.result) return;
+
+    const seats = { N: 'North', E: 'East', S: 'South', W: 'West' };
+    clear(dom.resultContract);
+    clear(dom.resultOutcome);
+
+    if (state.result.passedOut) {
+        dom.resultContract.textContent = 'Passed out';
+        dom.resultOutcome.textContent = 'No contract';
+        return;
+    }
+
+    const { level, strain, doubling, declarer, tricks, outcome, conceded, claimed } = state.result;
+    dom.resultContract.appendChild(document.createTextNode(String(level)));
+    if (strain === 'N') dom.resultContract.appendChild(document.createTextNode('NT'));
+    else appendSuitText(dom.resultContract, `!${strain}`);
+    if (doubling) dom.resultContract.appendChild(document.createTextNode(doubling));
+    dom.resultContract.appendChild(document.createTextNode(` by ${seats[declarer]}`));
+
+    const note = conceded ? ' (conceded)' : claimed ? ' (claimed)' : '';
+    dom.resultOutcome.textContent = `${tricks} tricks - ${outcome}${note}`;
+}
+
 function renderExplanations(state, dom) {
     clear(dom.explain);
     if (state.explanations.length === 0) return;
@@ -349,6 +379,7 @@ export function render(state, dom) {
     renderAuction(state, dom);
     renderBiddingBox(state, dom);
     renderExplanations(state, dom);
+    renderResult(state, dom);
 
     if (dom.tricks) {
         dom.tricks.textContent = `Tricks NS:${state.deal.tricksCount[0]} EW:${state.deal.tricksCount[1]}`;

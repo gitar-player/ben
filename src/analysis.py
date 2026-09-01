@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import botbidder
 import botopeninglead
@@ -108,12 +109,34 @@ class CardByCard:
         # Should be found based on bidding
         aceking = {}
         features = {}
-        if self.models.pimc_use_declaring or self.models.pimc_use_defending:
+        # PIMC is left out of card-by-card analysis.
+        #
+        # game.py gives each seat its own engine: one BGADLL shared by declarer
+        # and dummy, and a BGADefDLL per defender. The code below builds a
+        # single BGADLL and hands it to all four seats, so the play loop adds
+        # every card to its trick once per seat - the trick fills with the same
+        # card repeated, the opponents' hand is never reduced, and the native
+        # library rejects the position with "PIMC SetupEvaluation failed" on the
+        # very first card.
+        #
+        # Card play is analysed with the neural network and the double-dummy
+        # solver instead. Set BEN_ANALYSIS_PIMC=1 to build it anyway, for
+        # testing a fix.
+        wants_pimc = self.models.pimc_use_declaring or self.models.pimc_use_defending
+        if wants_pimc and os.environ.get('BEN_ANALYSIS_PIMC') == '1':
             from pimc.PIMC import BGADLL
             pimc = BGADLL(self.models, dummy_hand, decl_hand, contract, is_decl_vuln, self.sampler, self.verbose)
             if self.verbose:
                 print("PIMC",dummy_hand, decl_hand, contract)
         else:
+            if wants_pimc:
+                print("Analysing card play without PIMC - see the note in analysis.py.")
+                # The card players decide whether to consult PIMC from these
+                # flags, not from whether an engine was built, so they have to
+                # come down as well - the same way gameserver.py turns PIMC off
+                # by platform.
+                self.models.pimc_use_declaring = False
+                self.models.pimc_use_defending = False
             pimc = None
         from ddsolver import ddsolver
         dd = ddsolver.DDSolver()

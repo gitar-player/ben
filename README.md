@@ -328,6 +328,23 @@ silently starts serving that one after its next restart.
 exits at startup. There is no fallback to the old libdds, and no dds3 wheel on PyPI - the only
 alternatives are to update macOS or build it yourself with `bazelisk build -c opt //python:_dds3`.
 
+**Notebooks need the same `DYLD_LIBRARY_PATH` as the servers.** A Jupyter kernel does not
+inherit it from `start_ben.sh`, so `card_by_card.analyze()` fails with
+`RuntimeError: PIMC SetupEvaluation failed` - PIMC loads, but its DDS backend cannot dlopen
+`libdds`. Setting the variable inside the notebook is too late; dyld reads it at process start.
+Put it in the kernel instead, in the `env` block of
+`~/anaconda3/envs/TF2/share/jupyter/kernels/python3/kernel.json`:
+
+```json
+"env": { "DYLD_LIBRARY_PATH": "/Users/allwynsequeira/AllwynDev/ben/bin/BGA/macos/arm64" }
+```
+
+Then restart the kernel. That file is outside the repo, like the launchd plist, so it is one to
+recreate on a new machine. To check from a notebook:
+`import os; os.environ.get('DYLD_LIBRARY_PATH')`. The alternative, if you would rather not
+touch the kernel, is to turn PIMC off for the analysis with
+`models.pimc_use_declaring = models.pimc_use_defending = False`.
+
 **PIMC needs `DYLD_LIBRARY_PATH` pointing at `bin/BGA/macos/arm64`.** BGADLL is a NativeAOT .NET
 library whose `[DllImport("dds")]` goes through dlopen, and dlopen doesn't search the assembly's
 own directory on macOS. Without it the banner says `DDS: error: Unable to load shared library

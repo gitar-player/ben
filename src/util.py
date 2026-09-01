@@ -191,11 +191,14 @@ class Board(NamedTuple):
     play: List[str]
 
 def parse_lin(url):
-    lin=''
+    """Parse a BBO lin, given either the lin text or a handviewer URL."""
     if '?' in url:
         url = url.split('?')[1]
 
-    url = unquote(url)
+    # The result has to land in `lin`: everything below reads that name, and
+    # while it stayed empty every regex matched nothing and the vulnerability
+    # lookup raised IndexError for any input at all.
+    lin = unquote(url)
 
     rx_bid = r'mb\|([0-9a-zA-Z]+?)!?\|'
     rx_card = r'pc\|([C,D,H,S,c,d,h,s][2-9A,K,Q,J,T])\|'

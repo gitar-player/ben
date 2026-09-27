@@ -5,6 +5,8 @@
 # Launches the two processes the browser UI needs:
 #   gameserver.py  ws://localhost:4443  bot engine (websockets)
 #   appserver.py   http://localhost:8080  the UI itself
+# and, with --api, the REST API that allwyn-api.html drives:
+#   gameapi.py     http://localhost:8085  stateless bid/lead/play API
 #
 # Both must run from specific directories (appserver resolves BBA/CC and the
 # game db relative to the working directory), and the browser talks to the
@@ -14,6 +16,7 @@
 #   ./start_ben.sh                          random boards
 #   ./start_ben.sh --boards Boards/x.pbn    deal from a file
 #   ./start_ben.sh --force                  kill anything already on the ports
+#   ./start_ben.sh --api                    also start gameapi.py (or BEN_API=1)
 #   ./start_ben.sh --no-browser             don't open a browser window
 #
 # Any option that isn't listed above is passed through to gameserver.py.
@@ -42,6 +45,7 @@ PY="$(pick_python)"
 
 APP_PORT="${BEN_APP_PORT:-8080}"
 WS_PORT="${BEN_WS_PORT:-4443}"
+API_PORT="${BEN_API_PORT:-8085}"
 LOG_DIR="$ROOT/logs"
 
 # PIMC's engine (BGADLL) is a NativeAOT .NET library whose [DllImport("dds")]
@@ -56,6 +60,10 @@ fi
 
 OPEN_BROWSER=1
 FORCE=0
+# gameapi.py loads its own copy of the models, so it is opt-in: only
+# allwyn-api.html and other REST clients need it.
+START_API=0
+[[ "${BEN_API:-0}" =~ ^(1|true|yes)$ ]] && START_API=1
 GAMESERVER_ARGS=()
 
 # gameserver runs with its working directory set to src/, so any path the user
@@ -73,7 +81,8 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --no-browser) OPEN_BROWSER=0; shift ;;
         --force)      FORCE=1; shift ;;
-        -h|--help)    sed -n '3,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --api)        START_API=1; shift ;;
+        -h|--help)    sed -n '3,23p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *)            GAMESERVER_ARGS+=("$(absolutise "$1")"); shift ;;
     esac
 done
@@ -90,7 +99,10 @@ fi
 
 listeners_on() { lsof -ti "tcp:$1" -sTCP:LISTEN 2>/dev/null || true; }
 
-for spec in "$WS_PORT:gameserver" "$APP_PORT:appserver"; do
+PORT_SPECS=("$WS_PORT:gameserver" "$APP_PORT:appserver")
+(( START_API )) && PORT_SPECS+=("$API_PORT:gameapi")
+
+for spec in "${PORT_SPECS[@]}"; do
     port="${spec%%:*}"; what="${spec##*:}"
     busy="$(listeners_on "$port")"
     [[ -z "$busy" ]] && continue
@@ -153,7 +165,16 @@ PIDS+=("$GAMESERVER_PID")
 APPSERVER_PID=$!
 PIDS+=("$APPSERVER_PID")
 
-# --- wait until both are actually listening --------------------------------
+GAMEAPI_PID=""
+if (( START_API )); then
+    # Bound to localhost, whose Host header gameapi.py accepts by default.
+    ( cd "$ROOT/src" && exec "$PY" gameapi.py --host 127.0.0.1 --port "$API_PORT" ) \
+        > "$LOG_DIR/gameapi.log" 2>&1 &
+    GAMEAPI_PID=$!
+    PIDS+=("$GAMEAPI_PID")
+fi
+
+# --- wait until they are all actually listening -----------------------------
 
 # gameserver loads the neural nets before it binds, so give it plenty of time.
 wait_for_port() {
@@ -181,15 +202,25 @@ wait_for_port() {
 
 wait_for_port "$WS_PORT" gameserver "$GAMESERVER_PID" 300
 wait_for_port "$APP_PORT" appserver "$APPSERVER_PID" 60
+(( START_API )) && wait_for_port "$API_PORT" gameapi "$GAMEAPI_PID" 300
 
 URL="http://localhost:$APP_PORT/home"
 echo ""
 echo "BEN is up: $URL"
-echo "Ctrl-C to stop both servers."
+if (( START_API )); then
+    echo "REST API:  http://localhost:$API_PORT"
+    echo "API page:  http://localhost:$APP_PORT/app/allwyn-api.html?api=http://localhost:$API_PORT"
+fi
+echo "Ctrl-C to stop all servers."
 (( OPEN_BROWSER )) && open "$URL"
 
-# Exit as soon as either server dies, so we never leave a half-running app.
-while kill -0 "$GAMESERVER_PID" 2>/dev/null && kill -0 "$APPSERVER_PID" 2>/dev/null; do
+# Exit as soon as any server dies, so we never leave a half-running app.
+all_alive() {
+    for pid in ${PIDS[@]+"${PIDS[@]}"}; do
+        kill -0 "$pid" 2>/dev/null || return 1
+    done
+}
+while all_alive; do
     sleep 1
 done
-echo "a server exited - shutting the other one down"
+echo "a server exited - shutting the others down"

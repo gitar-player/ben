@@ -85,14 +85,16 @@ The app runs in the browser, and the service has two components: (1) "appserver"
 ./start_ben.sh --boards Boards/x.pbn    # deal from a file
 ./start_ben.sh --force                  # restart if it is already running
 ./start_ben.sh --no-browser             # don't open a browser window
+./start_ben.sh --api                    # also start gameapi.py, for allwyn-api.html (or BEN_API=1)
 ```
 
-Ctrl-C stops both servers. Output goes to `logs/gameserver.log` and `logs/appserver.log`.
+Ctrl-C stops all the servers. Output goes to `logs/gameserver.log` and `logs/appserver.log`
+(and `logs/gameapi.log` with `--api`). If any one of them exits, the others are stopped too.
 Any option other than the ones listed is passed through to `gameserver.py`.
 
 The interpreter is resolved in this order: `BEN_PYTHON`, an activated virtualenv, `./.venv`,
-a conda env named `TF2` or `ben`, then `python3`. `BEN_APP_PORT` / `BEN_WS_PORT` override the
-ports, but note the UI expects the gameserver on 4443 (see the dropdown note below).
+a conda env named `TF2` or `ben`, then `python3`. `BEN_APP_PORT` / `BEN_WS_PORT` /
+`BEN_API_PORT` override the ports, but note the UI expects the gameserver on 4443 (see the dropdown note below).
 
 #### Choosing the play UI
 
@@ -151,15 +153,16 @@ file. It needs no gameserver: the browser runs the table itself and asks the RES
 `gameapi.py` for each call and card, as [WEBSITE-INTEGRATION.md](WEBSITE-INTEGRATION.md)
 describes (endpoints in [README-api.md](README-api.md)).
 
-1. Start `appserver.py` (port 8080) - `./start_ben.sh` does - and `gameapi.py` (port 8085),
-   which `start_ben.sh` does not start:
+1. Start `appserver.py` (port 8080) and `gameapi.py` (port 8085):
 
    ```bash
-   cd src && python gameapi.py            # on macOS, with DYLD_LIBRARY_PATH set as start_ben.sh sets it
+   ./start_ben.sh --api
    ```
 
-   Add `--allowed-hosts '*'` if the browser reaches it by any name other than `localhost` /
-   `127.0.0.1`. In Docker, `start_ben_all.sh` starts both.
+   `gameapi.py` is opt-in because it loads its own copy of the models. It listens on
+   localhost only; to reach it by another name, run it by hand from `src/` with
+   `python gameapi.py --host 0.0.0.0 --allowed-hosts '*'` (on macOS, with `DYLD_LIBRARY_PATH` set
+   as `start_ben.sh` sets it). In Docker, `start_ben_all.sh` starts both.
 2. Open `http://localhost:8080/app/allwyn-api.html`.
 3. Choose a `.pbn` or `.lin` file, pick a board from the list, then **Play hand**.
    **Pause**/**Resume**, **Step** (one call or card at a time) and **Restart** control the deal;

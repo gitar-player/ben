@@ -195,6 +195,11 @@ export class BenApi {
         return this.get('/lead', { hand, seat, dealer, vul: apiVul(vul), ctx: auctionToCtx(auction) });
     }
 
+    /** What the bidding system says the last call of `auction` shows. */
+    explain({ seat, dealer, vul, auction }) {
+        return this.get('/explain', { seat, dealer, vul: apiVul(vul), ctx: auctionToCtx(auction) });
+    }
+
     play({ hand, dummy, seat, dealer, vul, auction, played }) {
         return this.get('/play', {
             hand, dummy, seat, dealer, vul: apiVul(vul),
@@ -216,13 +221,19 @@ function apiVul(vul) {
  *
  * `emit(message)` receives gameserver-shaped messages for GameState.
  * `log(entry)` receives one line per decision, for the page's play log.
+ * `humanSeats` are the seat indices a person plays. When one of them is to
+ * act, step() asks BEN nothing and resolves to {kind: 'input'}; the page then
+ * hands the decision in with submitCall() or submitCard(). A person who
+ * declares also plays dummy's cards, as declarer does at the table; one who is
+ * dummy watches BEN declare.
  */
 export class DealRunner {
-    constructor(board, api, { emit = () => {}, log = () => {}, localForcedPlays = true } = {}) {
+    constructor(board, api, { emit = () => {}, log = () => {}, localForcedPlays = true, humanSeats = [] } = {}) {
         this.board = board;
         this.api = api;
         this.emit = emit;
         this.log = log;
+        this.humanSeats = new Set(humanSeats);
         // A card that is the only legal play is played without asking BEN -
         // one fewer round trip, and the same thing gameapi.py does ("Forced").
         this.localForcedPlays = localForcedPlays;
@@ -246,8 +257,35 @@ export class DealRunner {
         return this.contract ? (this.contract.declarer + 2) % 4 : -1;
     }
 
+    /** Whose decision `seat`'s call or card is: declarer's, for dummy. */
+    controller(seat) {
+        return seat === this.dummy ? this.contract.declarer : seat;
+    }
+
+    /**
+     * The seat to act and what it has to do, or null between tricks and once
+     * the deal is over. `human` says whether the page must supply it.
+     */
+    get turn() {
+        let seat;
+        let need;
+        if (this.phase === 'bidding') {
+            seat = (this.dealer + this.auction.length) % 4;
+            need = 'bid';
+        } else if ((this.phase === 'lead' || this.phase === 'play') && this.trick.cards.length < 4) {
+            seat = (this.trick.leader + this.trick.cards.length) % 4;
+            need = 'card';
+        } else {
+            return null;
+        }
+        const human = this.humanSeats.has(need === 'card' ? this.controller(seat) : seat);
+        return { seat, need, human };
+    }
+
     /** Do the next thing. Resolves to what was done, for the page to pace itself. */
     async step() {
+        const turn = this.turn;
+        if (turn?.human) return this.awaitInput(turn);
         switch (this.phase) {
             case 'start': return this.start();
             case 'bidding': return this.nextCall();
@@ -291,6 +329,48 @@ export class DealRunner {
 
         if (auctionIsOver(this.auction)) this.endAuction();
         return { kind: 'bid', seat, call };
+    }
+
+    /** Tell GameState a person is to act, so it offers the bidding box or the cards. */
+    awaitInput({ seat, need }) {
+        if (need === 'bid') {
+            this.emit({
+                message: 'get_bid_input',
+                auction: [...this.auction],
+                can_double: isLegalCall(this.auction, 'X'),
+                can_redouble: isLegalCall(this.auction, 'XX'),
+            });
+        } else {
+            this.emit({ message: 'get_card_input' });
+        }
+        return { kind: 'input', need, seat };
+    }
+
+    /** A person's call. Throws, changing nothing, if it is not theirs to make or not legal. */
+    submitCall(rawCall, explanation = '') {
+        const turn = this.turn;
+        if (!turn?.human || turn.need !== 'bid') throw new ApiError('It is not your turn to call');
+        const call = normaliseCall(rawCall);
+        if (!isLegalCall(this.auction, call)) throw new ApiError(`${rawCall} is not a legal call here`);
+
+        this.auction.push(call);
+        this.emit({ message: 'bid_made', auction: [...this.auction], explanation });
+        this.log({ phase: 'bid', seat: turn.seat, action: call, who: 'You', explanation });
+        if (auctionIsOver(this.auction)) this.endAuction();
+        return { kind: 'bid', seat: turn.seat, call };
+    }
+
+    /** A person's card, for their own seat or, as declarer, for dummy. */
+    submitCard(rawCard) {
+        const turn = this.turn;
+        if (!turn?.human || turn.need !== 'card') throw new ApiError('It is not your turn to play');
+        const card = normaliseCard(rawCard);
+        this.playCard(turn.seat, card, { who: 'You' });
+        if (this.phase === 'lead') {
+            this.emit({ message: 'show_dummy', player: this.dummy, dummy: this.board.hands[this.dummy] });
+            this.phase = 'play';
+        }
+        return { kind: 'card', seat: turn.seat, card };
     }
 
     endAuction() {
@@ -406,8 +486,8 @@ export class DealRunner {
             dict.score = declarer % 2 === 0 ? declarerScore : -declarerScore;   // N-S view
         }
         this.result = dict;
+        this.phase = 'done';          // before deal_end, so its listeners see the deal over
         this.emit({ message: 'deal_end', pbn: this.board.hands.join(' '), dict });
-        this.phase = 'done';
     }
 }
 

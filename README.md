@@ -146,10 +146,10 @@ box is not.
 
 `bridge.html` is deliberately untouched by all of this, so upstream changes to it still merge.
 
-#### Watching BEN play a deal from a file: `allwyn-api.html`
+#### Playing a deal from a file: `allwyn-api.html`
 
-`allwyn-api.html` has BEN bid and play all four seats of a deal read from a `.pbn` or `.lin`
-file. It needs no gameserver: the browser runs the table itself and asks the REST API in
+`allwyn-api.html` has BEN bid and play a deal read from a `.pbn` or `.lin` file - all four
+seats, or the three you leave it when you take one. It needs no gameserver: the browser runs the table itself and asks the REST API in
 `gameapi.py` for each call and card, as [WEBSITE-INTEGRATION.md](WEBSITE-INTEGRATION.md)
 describes (endpoints in [README-api.md](README-api.md)).
 
@@ -167,6 +167,18 @@ describes (endpoints in [README-api.md](README-api.md)).
 3. Choose a `.pbn` or `.lin` file, pick a board from the list, then **Play hand**.
    **Pause**/**Resume**, **Step** (one call or card at a time) and **Restart** control the deal;
    **Pace** sets the delay between actions and **Scoring** sends `tournament=mp` or `imps`.
+4. To play a seat yourself, pick it under **You play** (default **None**: BEN plays all four).
+   Changing it starts the board again; `?seat=S` in the URL sets it too.
+
+With a seat of your own:
+
+- Only your hand is shown, and dummy's once the opening lead is made; all four are shown when
+  the deal ends.
+- When it is your call the bidding box appears (level, then strain; **Hint** shows what BEN
+  would call and what it considered). Your call is explained through `/explain` like BEN's.
+- When it is your card, click it. If you declare you also play dummy's cards; if you are dummy,
+  BEN declares and you watch.
+- After your call or card BEN carries on by itself; **Pause** stops it between actions.
 
 The API address defaults to `http://<this host>:8085`; change it in the **BEN API** box
 (remembered in localStorage) or pass `?api=http://host:8085` in the page URL. The page can be
@@ -185,7 +197,7 @@ What it reads and does:
   `/play` refuses a call made as dummy. A card that is the only legal play is played without a
   request.
 - The side panel logs every decision with the engine that made it (NN, Simulation, PIMC,
-  Forced...). The result is scored in the page, matching `src/scoring.py`.
+  Forced..., or You). The result is scored in the page, matching `src/scoring.py`.
 - An illegal or failed answer stops the deal without changing it; **Resume** or **Step** retries.
 
 The first request after `gameapi.py` starts is slow (models load lazily), and a whole deal

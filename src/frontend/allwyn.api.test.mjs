@@ -284,6 +284,88 @@ await check('BenApi builds the documented query and surfaces errors', async () =
     await assert.rejects(down.bid({ hand: 'x', seat: 'S', dealer: 'N', vul: 'None', auction: [] }), /allowed-hosts/);
 });
 
+await check('a human seat: step() waits, submit validates, declarer plays dummy too', async () => {
+    const board = parsePbn(PBN).boards[0];
+    // Dealer N: N P, E 1C, S 1S, W P, N 2C, E P, S 3N -> South declares.
+    const script = ['PASS', '1C', '1S', 'PASS', '2C', 'PASS', '3N', 'PASS', 'PASS', 'PASS'];
+    const calls = [];
+    let runner;
+    const state = new GameState({ humanSeats: [false, false, true, false], noHuman: false, allVisible: false });
+    runner = new DealRunner(board, fakeApi(board, script, () => runner, calls), {
+        emit: (m) => state.apply(m),
+        humanSeats: [2],
+        localForcedPlays: false,
+    });
+
+    let inputs = 0;
+    let guard = 0;
+    while (!runner.done && guard++ < 300) {
+        const outcome = await runner.step();
+        if (outcome.kind !== 'input') continue;
+        inputs += 1;
+        assert.ok(runner.turn.human);
+        if (outcome.need === 'bid') {
+            assert.equal(outcome.seat, 2);
+            assert.ok(state.expectBidInput, 'GameState offers the bidding box');
+            if (runner.auction.length === 2) {
+                // 1C was just bid by East: 1C again is not legal, and nothing changes.
+                const before = runner.auction.length;
+                assert.throws(() => runner.submitCall('1C'), /not a legal call/);
+                assert.equal(runner.auction.length, before);
+            }
+            runner.submitCall(script[runner.auction.length], 'mine');
+        } else {
+            // South declares, so South plays South's cards and North's (dummy).
+            assert.ok(outcome.seat === 2 || outcome.seat === 0, `asked for seat ${outcome.seat}`);
+            assert.ok(state.expectCardInput, 'GameState offers the cards');
+            const illegal = runner.hands[outcome.seat].find((c) => !runner.legalCards(outcome.seat).includes(c));
+            if (illegal) assert.throws(() => runner.submitCard(illegal), /cannot play/);
+            runner.submitCard(runner.legalCards(outcome.seat)[0]);
+        }
+    }
+    assert.ok(runner.done);
+    assert.equal(runner.contract.declarer, 2);
+    // BEN was never asked to call for South, nor to play for North or South.
+    assert.ok(!calls.some((c) => c[0] === 'bid' && c[1] === 'S'));
+    assert.ok(!calls.some((c) => c[0] === 'play' && (c[2] === 0 || c[2] === 2)));
+    assert.equal(inputs, 2 + 26);          // 1S and 3N, then 13 cards each for S and N
+    assert.equal(state.explanations.filter((e) => e.text === 'mine').length, 2);
+    assert.equal(runner.played.length, 52);
+});
+
+await check('a human defender makes the opening lead; a human dummy only watches', async () => {
+    const board = parsePbn(PBN).boards[0];
+    const script = ['PASS', '1C', '1S', 'PASS', '2C', 'PASS', '3N', 'PASS', 'PASS', 'PASS'];
+    for (const [human, expectedCards] of [[3, 13], [0, 0]]) {
+        let runner;
+        const bidScript = [...script];
+        runner = new DealRunner(board, fakeApi(board, bidScript, () => runner, []), { humanSeats: [human] });
+        let cards = 0;
+        let firstCardInput = null;
+        while (!runner.done) {
+            const outcome = await runner.step();
+            if (outcome.kind !== 'input') continue;
+            if (outcome.need === 'bid') runner.submitCall(script[runner.auction.length]);
+            else {
+                firstCardInput ??= runner.phase;
+                cards += 1;
+                runner.submitCard(runner.legalCards(outcome.seat)[0]);
+            }
+        }
+        assert.equal(cards, expectedCards, `seat ${human}`);
+        if (human === 3) assert.equal(firstCardInput, 'lead', 'West, on declarer\'s left, leads');
+    }
+});
+
+await check('submitting when it is not your turn is refused', async () => {
+    const board = parsePbn(PBN).boards[0];
+    let runner;
+    runner = new DealRunner(board, fakeApi(board, ['PASS', '1C'], () => runner, []), { humanSeats: [2] });
+    await runner.step();                                   // deal; North (BEN) to call
+    assert.throws(() => runner.submitCall('1S'), /not your turn/);
+    assert.throws(() => runner.submitCard('SA'), /not your turn/);
+});
+
 /* ---------------------------------------------------------- files on disk */
 
 for (const path of process.argv.slice(2)) {

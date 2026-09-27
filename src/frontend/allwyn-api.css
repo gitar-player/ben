@@ -47,6 +47,11 @@
     #sidebar { position: static; max-height: none; overflow-y: visible; }
 }
 
+/* Only shown when you play a seat. The gameserver's Alert button has nothing
+   to talk to here: BEN's API explains every call anyway. */
+#bidding[hidden] { display: none; }
+#bidding-calls .alert { display: none; }
+
 #controls {
     display: flex;
     flex-direction: column;

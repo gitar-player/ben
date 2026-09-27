@@ -57,6 +57,16 @@
                     <input type="url" id="api-base" spellcheck="false" autocomplete="off">
                 </label>
                 <label class="field">
+                    <span>You play</span>
+                    <select id="human-seat">
+                        <option value="">None - BEN plays all four</option>
+                        <option value="N">North</option>
+                        <option value="E">East</option>
+                        <option value="S">South</option>
+                        <option value="W">West</option>
+                    </select>
+                </label>
+                <label class="field">
                     <span>Scoring</span>
                     <select id="tournament">
                         <option value="">Server default</option>
@@ -80,6 +90,9 @@
                 <span class="progress" id="progress" aria-live="polite"></span>
             </div>
         </section>
+
+        <!-- Your bidding box, when you play a seat. -->
+        <div id="bidding" aria-label="Bidding box" hidden></div>
 
         <!-- The four seats around the table, laid out as the usual cross. -->
         <div id="play-area">
@@ -128,6 +141,14 @@
             </section>
         </aside>
     </main>
+
+    <dialog id="hint-dialog" aria-labelledby="hint-title">
+        <h2 id="hint-title">Hint</h2>
+        <div class="body" id="hint-body"></div>
+        <form method="dialog" class="buttons">
+            <button class="btn btn-primary" value="close" autofocus>Close</button>
+        </form>
+    </dialog>
 
     <script type="module" src="allwyn.apimain.js"></script>
 </body>

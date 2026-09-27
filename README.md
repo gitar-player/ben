@@ -144,6 +144,60 @@ box is not.
 
 `bridge.html` is deliberately untouched by all of this, so upstream changes to it still merge.
 
+#### Watching BEN play a deal from a file: `allwyn-api.html`
+
+`allwyn-api.html` has BEN bid and play all four seats of a deal read from a `.pbn` or `.lin`
+file. It needs no gameserver: the browser runs the table itself and asks the REST API in
+`gameapi.py` for each call and card, as [WEBSITE-INTEGRATION.md](WEBSITE-INTEGRATION.md)
+describes (endpoints in [README-api.md](README-api.md)).
+
+1. Start `appserver.py` (port 8080) - `./start_ben.sh` does - and `gameapi.py` (port 8085),
+   which `start_ben.sh` does not start:
+
+   ```bash
+   cd src && python gameapi.py            # on macOS, with DYLD_LIBRARY_PATH set as start_ben.sh sets it
+   ```
+
+   Add `--allowed-hosts '*'` if the browser reaches it by any name other than `localhost` /
+   `127.0.0.1`. In Docker, `start_ben_all.sh` starts both.
+2. Open `http://localhost:8080/app/allwyn-api.html`.
+3. Choose a `.pbn` or `.lin` file, pick a board from the list, then **Play hand**.
+   **Pause**/**Resume**, **Step** (one call or card at a time) and **Restart** control the deal;
+   **Pace** sets the delay between actions and **Scoring** sends `tournament=mp` or `imps`.
+
+The API address defaults to `http://<this host>:8085`; change it in the **BEN API** box
+(remembered in localStorage) or pass `?api=http://host:8085` in the page URL. The page can be
+served by any static web server - it only needs the API to be reachable and CORS to allow it.
+
+What it reads and does:
+
+- **PBN**: every game with a `[Deal]` tag. `[Dealer]` and `[Vulnerable]` are used when present,
+  otherwise they follow the board number; `"#"` repeats the previous game's value, and a deal
+  with one hand given as `-` has it filled in.
+- **LIN**: single hand records, vugraph/tournament files with many `md|` deals (labelled
+  open/closed room), and BBO handviewer URLs with the lin in the query string. A blank East hand
+  is worked out from the other three.
+- Any auction or play already in the file is ignored - BEN bids and plays the deal afresh.
+- Dummy's cards are asked of declarer (`seat` = declarer, `dummy` = dummy's hand), since
+  `/play` refuses a call made as dummy. A card that is the only legal play is played without a
+  request.
+- The side panel logs every decision with the engine that made it (NN, Simulation, PIMC,
+  Forced...). The result is scored in the page, matching `src/scoring.py`.
+- An illegal or failed answer stops the deal without changing it; **Resume** or **Step** retries.
+
+The first request after `gameapi.py` starts is slow (models load lazily), and a whole deal
+takes about a minute on a laptop. The logic runs without a browser:
+
+```bash
+node src/frontend/allwyn.api.test.mjs                        # parsers, rules, scoring, a full deal
+node src/frontend/allwyn.api.test.mjs demo/Camrose24_1.pbn   # also parse the files named
+```
+
+The code: `allwyn.dealfile.js` (PBN/LIN reading), `allwyn.api.js` (the API client, auction
+rules, scoring and `DealRunner`, which plays the deal and reports it as the gameserver's
+messages so `allwyn.state.js` and `allwyn.render.js` are reused unchanged), and
+`allwyn.apimain.js` (the page wiring), with `allwyn-api.css` on top of `allwyn.css`.
+
 #### Starting it automatically at login (macOS)
 
 `~/Library/LaunchAgents/com.ben.app.plist` runs the same script at login and restarts it if it

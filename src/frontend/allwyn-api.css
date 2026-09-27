@@ -4,8 +4,50 @@
  * Uses allwyn.css's tokens, so both themes come for free.
  */
 
+/* ------------------------------------------------------------------ layout */
+
+/* Two independent columns: controls over the table on the left, explanations
+   and the log on the right. allwyn.css puts the bidding box and the table in
+   two grid rows with the sidebar spanning both, so as the log grew the rows
+   grew with it and pushed the table down card by card. Wide enough for the
+   table and both side hands (about 63.5rem) plus the sidebar. */
+#container {
+    max-width: 1440px;
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    grid-template-areas: "stage sidebar";
+}
+
+/* The header and status line line up with the wider layout. */
+.topbar, .status { max-width: 1440px; }
+
+#stage {
+    grid-area: stage;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+}
+#stage #play-area { margin-inline: 0; }
+
+/* Stays in view beside the table and scrolls on its own. */
+#sidebar {
+    position: sticky;
+    top: var(--space-4);
+    max-height: calc(100vh - 2 * var(--space-4));
+    overflow-y: auto;
+}
+
+/* Too narrow for table and sidebar side by side: stack them, table first. */
+@media (max-width: 1420px) {
+    #container {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "stage" "sidebar";
+    }
+    #stage #play-area { margin-inline: auto; }
+    #sidebar { position: static; max-height: none; overflow-y: visible; }
+}
+
 #controls {
-    grid-area: bidding;
     display: flex;
     flex-direction: column;
     gap: var(--space-3);

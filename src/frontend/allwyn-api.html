@@ -36,6 +36,9 @@
     <p id="notice" class="notice" role="alert" aria-live="assertive" hidden></p>
 
     <main id="container">
+        <!-- Controls and table share the left column; the sidebar has the right
+             one to itself, so however long its log grows the table stays put. -->
+        <div id="stage">
         <!-- Where allwyn.html has its bidding box: BEN bids every seat here. -->
         <section id="controls" class="panel" aria-label="Deal controls">
             <div class="controls-row">
@@ -114,6 +117,7 @@
 
             <div id="east" class="hand" aria-label="East hand"></div>
             <div id="south" class="hand" aria-label="South hand"></div>
+        </div>
         </div>
 
         <aside id="sidebar">

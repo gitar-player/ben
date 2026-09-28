@@ -17,6 +17,7 @@ import {
     impsFor, reviewDecisions, playBenVersion, compareResults,
 } from './allwyn.api.js';
 import { GameState } from './allwyn.state.js';
+import { Card, Trick } from './allwyn.model.js';
 
 const results = [];
 async function check(name, fn) {
@@ -105,6 +106,101 @@ await check('parseDealFile picks by extension, then by content', () => {
     assert.equal(parseDealFile('x.pbn', PBN).boards.length, 2);
     assert.equal(parseDealFile('x.txt', PBN).boards.length, 2);
     assert.equal(parseDealFile('x.txt', LIN).boards.length, 1);
+});
+
+const RECORDED_PBN = `[Board "1"]
+[Dealer "N"]
+[Vulnerable "None"]
+[Deal "N:T5.982.874.AQ632 K43.73.KQ5.KJT54 AJ9.AQT6.JT62.98 Q8762.KJ54.A93.7"]
+[Declarer "W"]
+[Contract "3S"]
+[Result "9"]
+[Score "EW 140"]
+[Auction "N"]
+PASS 1C =1= X =2= XX =3=
+PASS 1N =4= PASS 2S
+PASS 3S PASS PASS
+PASS
+[Note "1: 3+ !C"]
+[Play "N"]
+ST SK SA S6
+S5 S3 S9 SQ
+CA C4 C8 C7
+D4 D5 DT DA
+D7 DQ D6 D3
+C6 CK C9 H4
+H2 H7 H6 HJ
+D8 DK D2 D9
+H8 H3 HA H5
+C2 S4 SJ S7
+C3 C5 DJ S8
+H9 CT HT HK
+CQ CJ HQ S2
+`;
+
+await check('PBN: the recorded contract, result, score and auction are read', () => {
+    const [board] = parsePbn(RECORDED_PBN).boards;
+    assert.deepEqual(board.recorded, {
+        auction: ['PASS', '1C', 'X', 'XX', 'PASS', '1N', 'PASS', '2S', 'PASS', '3S', 'PASS', 'PASS', 'PASS'],
+        contract: { level: 3, strain: 'S', doubling: '', declarer: 3 },
+        passedOut: false, tricks: 9, score: -140, hasResult: true,
+    });
+});
+
+await check('PBN: tricks counted from [Play] when there is no [Result]; the contract from the auction', () => {
+    const noResult = RECORDED_PBN.replace('[Result "9"]\n', '').replace('[Contract "3S"]\n', '').replace('[Declarer "W"]\n', '');
+    const [board] = parsePbn(noResult).boards;
+    assert.deepEqual(board.recorded.contract, { level: 3, strain: 'S', doubling: '', declarer: 3 });
+    assert.equal(board.recorded.tricks, 9);
+    assert.equal(board.recorded.score, -140);
+});
+
+await check('PBN: AP, {commentary}, passed out, contract only, nothing recorded', () => {
+    const base = `[Board "1"]\n[Dealer "N"]\n[Vulnerable "Both"]\n[Deal "N:${HANDS.join(' ')}"]\n`;
+    const ap = parsePbn(base + '[Auction "N"]\n1H {opens\nhearts} PASS 4H AP\n[Result "11"]\n').boards[0].recorded;
+    assert.deepEqual(ap.auction, ['1H', 'PASS', '4H', 'PASS', 'PASS', 'PASS']);
+    assert.deepEqual(ap.contract, { level: 4, strain: 'H', doubling: '', declarer: 0 });
+    assert.equal(ap.score, 650);                         // 4H+1 vulnerable, N-S
+
+    const passed = parsePbn(base + '[Contract "Pass"]\n[Auction "N"]\nAP\n').boards[0].recorded;
+    assert.equal(passed.passedOut, true);
+    assert.equal(passed.score, 0);
+    assert.equal(passed.hasResult, true);
+
+    const contractOnly = parsePbn(base + '[Declarer "S"]\n[Contract "2SX"]\n').boards[0].recorded;
+    assert.deepEqual(contractOnly.contract, { level: 2, strain: 'S', doubling: 'X', declarer: 2 });
+    assert.equal(contractOnly.hasResult, false);
+    assert.equal(contractOnly.score, null);
+
+    assert.equal(parsePbn(base).boards[0].recorded, null);
+    assert.equal(parsePbn(base + '[Contract ""]\n[Result ""]\n').boards[0].recorded, null);
+});
+
+await check('LIN: mb| calls with alerts, and the result from mc| or from 52 pc| cards', () => {
+    const md = 'md|3SAJ9HAQT6DJT62C98,SQ8762HKJ54DA93C7,ST5H982D874CAQ632,|sv|o|';
+    const calls = 'mb|p|mb|1C!|an|3+ C|mb|d|mb|r|mb|p|mb|1N|mb|p|mb|2S|mb|p|mb|3S|mb|p|mb|p|mb|p|';
+    const claimed = parseLin(md + calls + 'pc|ST|pc|SK|pc|SA|pc|S6|mc|9|').boards[0].recorded;
+    assert.deepEqual(claimed.contract, { level: 3, strain: 'S', doubling: '', declarer: 3 });
+    assert.equal(claimed.tricks, 9);
+    assert.equal(claimed.score, -140);
+
+    // The same play as the PBN, in the order played: leader first each trick.
+    const [board] = parsePbn(RECORDED_PBN).boards;
+    const played = [];
+    const rows = RECORDED_PBN.split('[Play "N"]\n')[1].trim().split('\n').map((l) => l.trim().split(/\s+/));
+    let leader = 0;                                     // W declares: North leads
+    for (const row of rows) {
+        const order = [0, 1, 2, 3].map((i) => row[(leader + i) % 4]);
+        played.push(...order);
+        leader = new Trick(leader, order.map((c) => new Card(c))).winner('NSHDC'.indexOf('S'));
+    }
+    const full = parseLin(md + calls + played.map((c) => `pc|${c}|`).join('')).boards[0].recorded;
+    assert.equal(full.tricks, board.recorded.tricks);
+
+    const noResult = parseLin(md + calls).boards[0].recorded;
+    assert.equal(noResult.hasResult, false);
+    assert.ok(noResult.contract);
+    assert.equal(parseLin(md).boards[0].recorded, null);
 });
 
 await check('board number gives dealer and vulnerability', () => {

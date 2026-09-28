@@ -179,7 +179,17 @@ With a seat of your own:
 - When it is your card, click it. If you declare you also play dummy's cards; if you are dummy,
   BEN declares and you watch.
 - After your call or card BEN carries on by itself; **Pause** stops it between actions.
-- When the deal ends, **You vs BEN** in the side panel compares your deal with BEN's, in two
+- If the file records how the board went at the table - PBN `[Contract]`, `[Declarer]`,
+  `[Result]`, `[Auction]` and `[Play]` (tricks are counted from the play when there is no
+  `[Result]`), or LIN `mb|` calls, `pc|` cards and an `mc|` claim - your result is compared with
+  it as soon as the deal ends, with no requests to BEN: a **Recorded** row on the result box (its
+  contract, score and the difference from yours in IMPs) and, in the side panel, both results
+  and both auctions side by side. Comparing with BEN is then offered as a button (**Compare
+  with BEN**) rather than started by itself. A file that records only the contract and auction
+  (bidding challenges) gets those compared, without scores. With BEN playing all four seats,
+  BEN's result is compared with the recorded one the same way.
+- When the deal ends - straight away when the file has no recorded result, otherwise when you
+  ask - the side panel compares your deal with BEN's, in two
   ways. First, BEN is asked what it would have done at each of your calls and cards, in the
   same position (same hand, same auction or play so far); every place it would have chosen
   differently is listed with BEN's reason, and forced cards are not counted. Then the board is

@@ -122,13 +122,20 @@
                     <div id="result-contract" class="result-contract"></div>
                     <div id="result-outcome" class="result-outcome"></div>
                     <div id="result-score" class="result-score" hidden></div>
-                    <!-- BEN's contract and result on the same board, once it has played it. -->
-                    <div id="result-ben" class="result-ben" hidden>
-                        <div class="result-label">BEN's table</div>
-                        <div id="result-ben-contract" class="result-ben-contract"></div>
-                        <div id="result-ben-outcome" class="result-ben-outcome"></div>
-                        <div id="result-ben-score" class="result-ben-score" hidden></div>
-                    </div>
+                    <!-- The same board elsewhere: as recorded in the file, and as BEN
+                         played it. One compact row each, against the result above. -->
+                    <table id="result-others" class="result-others" hidden>
+                        <tbody>
+                            <tr id="result-rec-row" hidden>
+                                <th>Recorded</th><td class="contract"></td><td class="made"></td>
+                                <td class="score"></td><td class="diff"></td>
+                            </tr>
+                            <tr id="result-ben-row" hidden>
+                                <th>BEN</th><td class="contract"></td><td class="made"></td>
+                                <td class="score"></td><td class="diff"></td>
+                            </tr>
+                        </tbody>
+                    </table>
                     <!-- Where the comparison with BEN is up to, when you played a seat. -->
                     <div id="result-compare" class="result-compare" aria-live="polite" hidden></div>
                     <div class="result-buttons">
@@ -160,11 +167,21 @@
 
         <aside id="sidebar">
             <!-- Filled in after a deal you played: BEN in your seat, and BEN at all four. -->
-            <section id="compare" class="panel" aria-label="Your deal compared with BEN's" hidden>
-                <h2>You vs BEN</h2>
-                <p id="compare-status" class="compare-status" aria-live="polite"></p>
-                <div id="compare-result"></div>
-                <div id="compare-decisions"></div>
+            <section id="compare" class="panel" aria-label="Your deal compared" hidden>
+                <h2>Comparison</h2>
+                <!-- Against the result recorded in the file, when it has one. -->
+                <div id="compare-recorded" hidden>
+                    <h3 id="compare-recorded-title">Against the recorded table</h3>
+                    <div id="compare-recorded-body"></div>
+                </div>
+                <!-- Against BEN: automatic without a recorded result, on request with one. -->
+                <div id="compare-ben" hidden>
+                    <h3>Against BEN</h3>
+                    <button type="button" class="btn" id="compare-ben-start" hidden>Compare with BEN</button>
+                    <p id="compare-status" class="compare-status" aria-live="polite"></p>
+                    <div id="compare-result"></div>
+                    <div id="compare-decisions"></div>
+                </div>
             </section>
             <div id="explain" class="explain" aria-label="Bidding explanations"></div>
             <section id="play-log" class="panel" aria-label="What BEN did" hidden>

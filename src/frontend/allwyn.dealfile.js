@@ -6,9 +6,18 @@
  *   { label, board, dealer: 'N'|'E'|'S'|'W', vul: 'None'|'NS'|'EW'|'Both',
  *     hands: [north, east, south, west] }      // PBN holdings, "AK4.QJ.T98.65432"
  *
- * Only the deal is read. Any auction or play recorded in the file is ignored:
- * the point of allwyn-api.html is to have BEN bid and play the cards afresh.
+ * plus, when the file records how the board went at the table:
+ *
+ *   recorded: { auction: [...calls], contract: {level, strain, doubling,
+ *               declarer: seat index} | null, passedOut, tricks (declarer's,
+ *               or null if not known), score (N-S's, or null), hasResult }
+ *
+ * The recording is only ever compared against: BEN bids and plays the deal
+ * afresh whatever the file says happened.
  */
+
+import { normaliseCall, auctionIsOver, isLegalCall, contractFromAuction, scoreContract } from './allwyn.api.js';
+import { Card, Trick } from './allwyn.model.js';
 
 const SEATS = 'NESW';
 const RANKS = 'AKQJT98765432';
@@ -105,15 +114,37 @@ export function parsePbn(text) {
         tags = {};
     };
 
+    // The lines under [Auction] and [Play] are the calls and cards; anything
+    // in {braces}, which may run over several lines, is commentary.
+    let section = null;
+    let inComment = false;
     for (const raw of text.split(/\r?\n/)) {
-        const line = raw.trim();
-        if (line.startsWith('%') || line.startsWith(';')) continue;
+        let line = raw.trim();
+        if (inComment) {
+            const end = line.indexOf('}');
+            if (end < 0) continue;
+            line = line.slice(end + 1).trim();
+            inComment = false;
+        }
+        line = line.replace(/\{[^}]*\}/g, ' ');
+        if (line.includes('{')) {
+            line = line.slice(0, line.indexOf('{'));
+            inComment = true;
+        }
+        line = line.trim();
+        if (!line || line.startsWith('%') || line.startsWith(';')) continue;
         const tag = /^\[(\w+)\s+"(.*)"\]$/.exec(line);
-        if (!tag) continue;
+        if (!tag) {
+            if (section === 'Auction' || section === 'Play') {
+                (tags[`_${section}`] ??= []).push(line);
+            }
+            continue;
+        }
         // A new [Event] or [Board] after a deal starts the next game, whether
         // or not there was a blank line between them.
         if ((tag[1] === 'Event' || tag[1] === 'Board') && tags.Deal) flush();
         tags[tag[1]] = tag[2];
+        section = tag[1];
     }
     flush();
     return { boards, errors };
@@ -146,7 +177,104 @@ function pbnGame(tags) {
         dealer,
         vul,
         hands: finishHands(hands),
+        recorded: pbnRecorded(tags, dealer, vul),
     };
+}
+
+/**
+ * How the board went at the table, from [Contract], [Declarer], [Result] and
+ * the [Auction] and [Play] sections. Null when the file says nothing.
+ */
+function pbnRecorded(tags, dealer, vul) {
+    const dealerIndex = SEATS.indexOf(dealer);
+
+    // Calls, from the auction's first seat - which should be the dealer.
+    let auction = [];
+    const auctionSeat = SEATS.indexOf((tags.Auction ?? '').trim().toUpperCase());
+    if (auctionSeat === dealerIndex && tags._Auction) {
+        auction = readCalls(tags._Auction.join(' ').split(/\s+/));
+    }
+
+    // The contract, from the tags when they give it, else from the auction.
+    let contract = null;
+    let passedOut = false;
+    const contractTag = (tags.Contract ?? '').trim().toUpperCase();
+    const declarerTag = SEATS.indexOf((tags.Declarer ?? '').trim().toUpperCase());
+    const m = /^([1-7])(NT|[CDHSN])(XX|X)?$/.exec(contractTag);
+    if (m && declarerTag >= 0) {
+        contract = { level: Number(m[1]), strain: m[2][0], doubling: m[3] ?? '', declarer: declarerTag };
+    } else if (contractTag === 'PASS' || contractTag === 'AP') {
+        passedOut = true;
+    } else if (auction.length && auctionIsOver(auction)) {
+        contract = contractFromAuction(dealerIndex, auction);
+        passedOut = !contract;
+    }
+
+    // Declarer's tricks: [Result] if given, else counted from a full [Play].
+    let tricks = null;
+    if (/^\d+$/.test((tags.Result ?? '').trim())) tricks = Number(tags.Result.trim());
+    else if (contract && tags._Play) tricks = pbnPlayTricks(tags, contract);
+
+    return recording(auction, contract, passedOut, tricks, vul);
+}
+
+/**
+ * Tricks declarer took, from a [Play] section: one line per trick, the
+ * columns in seat order from the [Play] seat - not in the order played. Null
+ * unless all 13 tricks are there.
+ */
+function pbnPlayTricks(tags, contract) {
+    const first = SEATS.indexOf((tags.Play ?? '').trim().toUpperCase());
+    if (first < 0) return null;
+    const rows = tags._Play.join(' ').split(/\s+/).filter((t) => t && t !== '*');
+    const strain = 'NSHDC'.indexOf(contract.strain);
+    let leader = (contract.declarer + 1) % 4;
+    let won = 0;
+    for (let trick = 0; trick < 13; trick++) {
+        const row = rows.slice(trick * 4, trick * 4 + 4);
+        if (row.length < 4 || row.some((c) => !/^[SHDC][2-9TJQKA]$/i.test(c))) return null;
+        const bySeat = [];
+        row.forEach((card, column) => { bySeat[(first + column) % 4] = card.toUpperCase(); });
+        const played = [0, 1, 2, 3].map((i) => new Card(bySeat[(leader + i) % 4]));
+        leader = new Trick(leader, played).winner(strain);
+        if (leader % 2 === contract.declarer % 2) won += 1;
+    }
+    return won;
+}
+
+/** Tokens from an auction section or mb| tags -> calls, stopping at anything unreadable. */
+function readCalls(tokens) {
+    const calls = [];
+    for (let token of tokens) {
+        token = token.replace(/!+$/, '').trim();
+        // Note references (=1=), annotations ($1) and the end marker (*) are not calls.
+        if (!token || /^=\d+=$/.test(token) || /^\$\d+$/.test(token) || token === '*' || token === '-') continue;
+        if (token.toUpperCase() === 'AP') {
+            // "All pass": passes until the auction is over.
+            do calls.push('PASS'); while (!auctionIsOver(calls));
+            break;
+        }
+        const call = normaliseCall(token);
+        if (!/^(PASS|X|XX|[1-7][CDHSN])$/.test(call) || !isLegalCall(calls, call)) break;
+        calls.push(call);
+        if (auctionIsOver(calls)) break;
+    }
+    return calls;
+}
+
+/** The recorded result with its N-S score worked out, or null if there is nothing to go on. */
+function recording(auction, contract, passedOut, tricks, vul) {
+    if (!contract && !passedOut && auction.length === 0) return null;
+    let score = null;
+    if (passedOut) score = 0;
+    else if (contract && Number.isInteger(tricks) && tricks >= 0 && tricks <= 13) {
+        const vulnerable = vul === 'Both' || vul === (contract.declarer % 2 === 0 ? 'NS' : 'EW');
+        const declarerScore = scoreContract(contract, vulnerable, tricks);
+        score = contract.declarer % 2 === 0 ? declarerScore : -declarerScore;
+    } else {
+        tricks = null;
+    }
+    return { auction, contract, passedOut, tricks, score, hasResult: score !== null };
 }
 
 /* --------------------------------------------------------------------- LIN */
@@ -234,7 +362,42 @@ function linDeal(segment, lookBack) {
         dealer,
         vul,
         hands,
+        recorded: linRecorded(segment, dealer, vul),
     };
+}
+
+/**
+ * How the board went, from the deal's mb| calls, pc| cards (in the order
+ * played) and mc| claim (declarer's total tricks). Null when there are none.
+ */
+function linRecorded(segment, dealer, vul) {
+    const dealerIndex = SEATS.indexOf(dealer);
+    const tokens = [...segment.matchAll(/(?<=^|\|)mb\|([^|]*)\|/gi)].map((m) => {
+        const t = m[1].replace(/!+$/, '').trim().toUpperCase();
+        return { P: 'PASS', D: 'X', R: 'XX' }[t] ?? t;
+    });
+    const auction = readCalls(tokens);
+    if (!auctionIsOver(auction)) return recording(auction, null, false, null, vul);
+
+    const contract = contractFromAuction(dealerIndex, auction);
+    if (!contract) return recording(auction, null, true, null, vul);
+
+    const claim = /(?:^|\|)mc\|(\d+)\|/i.exec(segment);
+    let tricks = claim ? Number(claim[1]) : null;
+    if (tricks === null) {
+        const cards = [...segment.matchAll(/(?<=^|\|)pc\|([^|]*)\|/gi)]
+            .map((m) => m[1].trim().toUpperCase().replace('10', 'T'));
+        if (cards.length === 52 && cards.every((c) => /^[SHDC][2-9TJQKA]$/.test(c))) {
+            const strain = 'NSHDC'.indexOf(contract.strain);
+            let leader = (contract.declarer + 1) % 4;
+            tricks = 0;
+            for (let i = 0; i < 52; i += 4) {
+                leader = new Trick(leader, cards.slice(i, i + 4).map((c) => new Card(c))).winner(strain);
+                if (leader % 2 === contract.declarer % 2) tricks += 1;
+            }
+        }
+    }
+    return recording(auction, contract, false, tricks, vul);
 }
 
 /* ------------------------------------------------------------------ either */

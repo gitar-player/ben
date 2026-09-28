@@ -176,7 +176,8 @@
 
 /* --------------------------------------------------------------- comparison */
 
-/* On the result box on the felt: BEN's own result under yours, each labelled. */
+/* On the result box on the felt: the recorded table's and BEN's results
+   under yours, a compact row each, with the difference from yours. */
 .result-label {
     font-size: 0.72rem;
     font-weight: 700;
@@ -184,38 +185,28 @@
     text-transform: uppercase;
     color: rgb(255 255 255 / 55%);
 }
-.result-ben {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
+.result-label[hidden] { display: none; }
+.result-others {
+    border-collapse: collapse;
     margin-top: var(--space-1);
-    padding-top: var(--space-2);
     border-top: 1px solid rgb(255 255 255 / 18%);
-    align-self: stretch;
-}
-.result-ben[hidden] { display: none; }
-.result-ben-contract { font-size: 1.15rem; font-weight: 800; color: #fff; }
-.result-ben-outcome { font-size: 0.9rem; font-weight: 600; color: rgb(255 255 255 / 75%); }
-/* Yours, a size down. */
-.result-ben-score {
-    margin-top: 2px;
-    padding: 1px 10px;
-    border-radius: 999px;
-    background: rgb(255 255 255 / 10%);
-    border: 1px solid rgb(255 255 255 / 20%);
     font-size: 0.9rem;
-    font-weight: 800;
-    color: #fff;
+    color: rgb(255 255 255 / 85%);
     font-variant-numeric: tabular-nums;
 }
-.result-ben-score[hidden] { display: none; }
-
-/* Two results in the box: tighten it so it still fits inside the felt. */
-#result:has(#result-ben:not([hidden])) { gap: 6px; padding: var(--space-3) var(--space-5); }
-#result:has(#result-ben:not([hidden])) .result-contract { font-size: 1.35rem; }
-#result:has(#result-ben:not([hidden])) .result-score { margin-top: 0; font-size: 1rem; }
-.result-label[hidden] { display: none; }
+.result-others th, .result-others td { padding: 5px 6px 0; text-align: left; white-space: nowrap; }
+.result-others th {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgb(255 255 255 / 55%);
+}
+.result-others .contract { font-weight: 800; color: #fff; }
+.result-others .diff { font-weight: 800; text-align: right; }
+.result-others .diff.better { color: #6fdc8c; }
+.result-others .diff.worse  { color: #ff8f8f; }
+.result-others tr[hidden] { display: none; }
 
 /* On the result box on the felt: the comparison's progress, then its verdict. */
 .result-compare { font-size: 0.9rem; font-weight: 600; color: rgb(255 255 255 / 80%); max-width: 21rem; text-wrap: balance; }
@@ -255,6 +246,22 @@
 #compare-decisions .why   { display: block; color: var(--text-muted); font-size: 0.8rem; }
 
 /* ------------------------------------------------------------- decision log */
+
+#compare h3 {
+    margin: var(--space-3) 0 var(--space-2);
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text);
+}
+#compare h3:first-of-type { margin-top: 0; }
+/* The BEN section under the recorded one: set apart. */
+#compare-recorded:not([hidden]) + #compare-ben {
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
+}
+#compare-ben-start { margin-bottom: var(--space-2); }
+.compare-note { margin: 0 0 var(--space-2); font-size: 0.85rem; color: var(--text-muted); }
 
 #sidebar .panel h2 {
     font-size: 0.8rem;

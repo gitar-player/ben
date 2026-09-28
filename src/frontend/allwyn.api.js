@@ -535,6 +535,8 @@ export class DealRunner {
             dict.contract = contractString(this.contract);
             dict.tricks_taken = tricks;
             dict.score = declarer % 2 === 0 ? declarerScore : -declarerScore;   // N-S view
+        } else {
+            dict.score = 0;                                                        // passed out
         }
         this.result = dict;
         this.phase = 'done';          // before deal_end, so its listeners see the deal over

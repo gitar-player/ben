@@ -11,11 +11,11 @@
 
 import { Card, parseContract, contractOutcome, scoreLine } from './allwyn.model.js';
 import { GameState } from './allwyn.state.js';
-import { collectDom, render, appendCall, appendSuitText } from './allwyn.render.js';
+import { collectDom, render, appendCall, appendSuitText, suitClass } from './allwyn.render.js';
 import { initTheme } from './allwyn.theme.js';
 import { parseDealFile } from './allwyn.dealfile.js';
 import {
-    BenApi, DealRunner, reviewDecisions, playBenVersion, compareResults,
+    BenApi, DealRunner, reviewDecisions, playBenVersion, compareResults, contractString,
 } from './allwyn.api.js';
 
 const SEAT_NAMES = ['North', 'East', 'South', 'West'];
@@ -45,10 +45,13 @@ const ui = {
     compare: $('#compare'),
     resultCompare: $('#result-compare'),
     resultYouLabel: $('#result-you-label'),
-    resultBen: $('#result-ben'),
-    resultBenContract: $('#result-ben-contract'),
-    resultBenOutcome: $('#result-ben-outcome'),
-    resultBenScore: $('#result-ben-score'),
+    resultOthers: $('#result-others'),
+    resultRecRow: $('#result-rec-row'),
+    resultBenRow: $('#result-ben-row'),
+    compareRecorded: $('#compare-recorded'),
+    compareRecordedBody: $('#compare-recorded-body'),
+    compareBen: $('#compare-ben'),
+    compareBenStart: $('#compare-ben-start'),
     resultShowCompare: $('#result-show-compare'),
     compareStatus: $('#compare-status'),
     compareResult: $('#compare-result'),
@@ -96,7 +99,8 @@ let runner = null;
 let running = false;          // playing continuously, as opposed to stepping
 let driving = false;          // drive() is running, perhaps paused between steps
 let generation = 0;           // bumped on restart, so a stale request is ignored
-let compared = false;         // the comparison with BEN has been started for this deal
+let dealEndHandled = false;   // the end-of-deal comparisons have been set up for this deal
+let benStarted = false;       // the comparison with BEN has been started for this deal
 
 initTheme($('#theme-toggle'));
 initPanelToggle($('#auction-toggle'), 'allwyn.auctionHidden', 'auctionHidden', 'Auction', 'the auction panel');
@@ -200,12 +204,19 @@ function loadBoard() {
     state.expectTrickConfirm = false;
     ui.logList.replaceChildren();
     ui.log.hidden = true;
-    compared = false;
+    dealEndHandled = false;
+    benStarted = false;
     ui.compare.hidden = true;
+    ui.compareRecorded.hidden = true;
+    ui.compareRecordedBody.replaceChildren();
+    ui.compareBen.hidden = true;
+    ui.compareBenStart.hidden = true;
+    ui.resultOthers.hidden = true;
+    ui.resultRecRow.hidden = true;
+    ui.resultBenRow.hidden = true;
     ui.resultCompare.hidden = true;
     ui.resultCompare.className = 'result-compare';
     ui.resultYouLabel.hidden = true;
-    ui.resultBen.hidden = true;
     ui.resultShowCompare.hidden = true;
     ui.compareStatus.textContent = '';
     ui.compareResult.replaceChildren();
@@ -245,7 +256,15 @@ ui.step.addEventListener('click', () => {
 
 ui.restart.addEventListener('click', loadBoard);
 
-ui.resultShowCompare.addEventListener('click', showComparison);
+// On the result box: start the comparison with BEN if it is only on offer,
+// then bring the panel into view.
+ui.resultShowCompare.addEventListener('click', () => {
+    if (!benStarted && runner?.done && humanSeat() >= 0) compareWithBen();
+    showComparison();
+});
+ui.compareBenStart.addEventListener('click', () => {
+    if (!benStarted && runner?.done && humanSeat() >= 0) compareWithBen();
+});
 
 $('#result-continue')?.addEventListener('click', () => {
     state.result = null;
@@ -269,7 +288,7 @@ async function drive() {
             if (!runner?.turn?.human || runner.done) running = false;
             promptIfYourTurn();
             paintControls();
-            if (runner?.done && humanSeat() >= 0 && !compared) compareWithBen();
+            if (runner?.done && !dealEndHandled) onDealEnd();
         }
     }
 }
@@ -383,12 +402,76 @@ function setStatus(status, detail) {
 /* ------------------------------------------------------------ comparison */
 
 /**
+ * When a deal ends. If the file recorded how the board went at the table,
+ * your result is compared with that at once - no requests needed - and the
+ * comparison with BEN is offered as a button. Without a recording, a deal you
+ * played is compared with BEN straight away, as before. With BEN at all four
+ * seats there is nobody to compare with BEN, but its result is still set
+ * against a recorded one.
+ */
+function onDealEnd() {
+    dealEndHandled = true;
+    const seat = humanSeat();
+    const recorded = runner.board.recorded;
+    if (!recorded && seat < 0) return;
+
+    ui.compare.hidden = false;
+    ui.resultYouLabel.textContent = seat < 0 ? "BEN's table" : 'Your table';
+    ui.resultYouLabel.hidden = false;
+    if (recorded) showRecorded(runner, recorded, seat);
+
+    if (seat >= 0) {
+        ui.compareBen.hidden = false;
+        if (recorded) {
+            ui.compareBenStart.hidden = false;
+            ui.resultShowCompare.textContent = 'Compare with BEN';
+            ui.resultShowCompare.hidden = false;
+            ui.progress.textContent = 'Deal complete. Compared with the recorded table; Compare with BEN for more.';
+        } else {
+            compareWithBen();
+        }
+    }
+    scrollSidebarToTop();
+}
+
+/** The recording in the shape renderTables() and resultRow() read a runner in. */
+function recordedTable(recorded, board) {
+    return {
+        result: {
+            contract: recorded.contract ? contractString(recorded.contract) : undefined,
+            tricks_taken: recorded.tricks ?? undefined,
+            score: recorded.score ?? undefined,
+        },
+        contract: recorded.contract,
+        auction: recorded.auction,
+        dealer: 'NESW'.indexOf(board.dealer),
+    };
+}
+
+/** Your table against the one recorded in the file: panel section and result-box row. */
+function showRecorded(played, recorded, seat) {
+    const table = recordedTable(recorded, played.board);
+    const you = seat < 0 ? 'BEN' : 'You';
+    $('#compare-recorded-title').textContent = seat < 0
+        ? "BEN's table against the recorded one"
+        : 'Against the recorded table';
+    renderTables(ui.compareRecordedBody, played, table, seat, {
+        you, other: 'Recorded', otherLong: 'the recorded table',
+    });
+    ui.compareRecorded.hidden = false;
+    resultRow(ui.resultRecRow, table, played, seat);
+}
+
+/**
  * Once a deal you played is over: what BEN would have done at each of your
  * decisions, then the whole board again with BEN at all four seats, scored
  * against yours. Both are plain API calls on positions the page already has.
  */
 async function compareWithBen() {
-    compared = true;
+    benStarted = true;
+    ui.compareBen.hidden = false;
+    ui.compareBenStart.hidden = true;
+    ui.resultShowCompare.textContent = 'Show comparison';
     const mine = generation;
     const cancelled = () => mine !== generation;
     const played = runner;
@@ -436,28 +519,55 @@ async function compareWithBen() {
         return;
     }
     if (cancelled() || !ben) return;
-    const verdict = renderTables(played, ben, seat);
-    showBenResult(ben);
+    renderTables(ui.compareResult, played, ben, seat, { you: 'You', other: 'BEN', otherLong: 'BEN' });
+    resultRow(ui.resultBenRow, ben, played, seat);
     status('');
-    ui.resultCompare.textContent = verdict.text;
-    ui.resultCompare.classList.toggle('better', verdict.diff > 0);
-    ui.resultCompare.classList.toggle('worse', verdict.diff < 0);
-    ui.progress.textContent = 'Deal complete. See You vs BEN.';
+    ui.resultCompare.hidden = true;           // the row says it now
+    ui.progress.textContent = 'Deal complete. See the comparison.';
     scrollSidebarToTop();
 }
 
-/** BEN's contract, tricks and score on the result box, laid out as yours is above it. */
-function showBenResult(ben) {
-    ui.resultBenContract.replaceChildren();
-    appendContract(ui.resultBenContract, ben.result.contract);
-    const contract = parseContract(ben.result.contract);
-    ui.resultBenOutcome.textContent = contract
-        ? `${ben.result.tricks_taken} tricks - ${contractOutcome(contract.level, ben.result.tricks_taken)}`
-        : 'No contract';
-    const score = contract ? scoreLine(ben.result.score) : null;
-    ui.resultBenScore.textContent = score ?? '';
-    ui.resultBenScore.hidden = !score;
-    ui.resultBen.hidden = false;
+/**
+ * One compact row on the result box for another table's result: contract,
+ * how it went, score, and the difference from yours in IMPs.
+ */
+function resultRow(row, other, yours, seat) {
+    const [contractCell, madeCell, scoreCell, diffCell] = row.querySelectorAll('td');
+    contractCell.replaceChildren();
+    const c = parseContract(other.result.contract);
+    if (c) {
+        appendCall(contractCell, `${c.level}${c.strain}`);
+        contractCell.appendChild(document.createTextNode(`${c.doubling} ${c.declarer}`));
+    } else {
+        contractCell.textContent = other.contract === null && other.result.score === 0 ? 'Passed out' : '?';
+    }
+    const tricks = other.result.tricks_taken;
+    madeCell.textContent = !c ? '' : Number.isFinite(tricks) ? madeShort(c.level, tricks) : 'result ?';
+    madeCell.title = c && Number.isFinite(tricks) ? `${tricks} tricks - ${contractOutcome(c.level, tricks)}` : '';
+    scoreCell.textContent = Number.isFinite(other.result.score) ? (scoreLine(other.result.score) ?? '0') : '';
+
+    diffCell.className = 'diff';
+    diffCell.textContent = '';
+    diffCell.title = '';
+    if (Number.isFinite(other.result.score)) {
+        const cmp = compareResults(yours.result, other.result, viewSeat(seat));
+        diffCell.textContent = `${signed(cmp.imps)} IMP`;
+        if (cmp.diff) diffCell.classList.add(cmp.diff > 0 ? 'better' : 'worse');
+        diffCell.title = `${seat < 0 ? "N-S at BEN's table" : 'You'}: ${signed(cmp.diff)} points against this result`;
+    }
+    row.hidden = false;
+    ui.resultOthers.hidden = false;
+}
+
+/** "=", "+1", "-2" - tricks against the contract. */
+function madeShort(level, tricks) {
+    const over = tricks - (level + 6);
+    return over === 0 ? '=' : over > 0 ? `+${over}` : `\u2212${-over}`;
+}
+
+/** Whose side scores are seen from: yours, or N-S when BEN played all four. */
+function viewSeat(seat) {
+    return seat < 0 ? 0 : seat;
 }
 
 /** The panel is at the top of the sidebar, which scrolls on its own. */
@@ -471,12 +581,17 @@ function showComparison() {
     ui.compare.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-/** Your table and BEN's side by side: contract, tricks, score, and the auctions. */
-function renderTables(yours, bens, seat) {
-    const cmp = compareResults(yours.result, bens.result, seat);
+/**
+ * Two tables side by side - yours and BEN's, or yours and the recorded one:
+ * contract, tricks, score, the verdict, and both auctions. Into `target`.
+ */
+function renderTables(target, yours, bens, seat, names) {
+    const view = viewSeat(seat);
+    const scored = Number.isFinite(bens.result.score);
+    const cmp = scored ? compareResults(yours.result, bens.result, view) : null;
     const table = document.createElement('table');
     const head = table.createTHead().insertRow();
-    for (const text of ['', 'You', 'BEN']) {
+    for (const text of ['', names.you, names.other]) {
         const th = document.createElement('th');
         th.textContent = text;
         head.appendChild(th);
@@ -492,32 +607,48 @@ function renderTables(yours, bens, seat) {
             fill(td, runner);
         }
     };
-    row('Contract', (td, r) => appendContract(td, r.result.contract));
+    row('Contract', (td, r) => {
+        if (r.contract === null && r.result.contract === undefined && !Number.isFinite(r.result.score)) {
+            td.textContent = '?';
+        } else {
+            appendContract(td, r.result.contract);
+        }
+    });
     row("Declarer's tricks", (td, r) => {
         td.className = 'num';
-        td.textContent = r.contract ? String(r.result.tricks_taken) : '-';
+        td.textContent = !r.contract ? '-' : Number.isFinite(r.result.tricks_taken) ? String(r.result.tricks_taken) : '?';
     });
     row('Score', (td, r) => {
         td.className = 'num';
-        td.textContent = signed((r.result.score ?? 0) * (seat % 2 === 0 ? 1 : -1));
+        td.textContent = Number.isFinite(r.result.score)
+            ? signed(r.result.score * (view % 2 === 0 ? 1 : -1))
+            : 'not recorded';
     });
 
     const verdict = document.createElement('p');
     verdict.className = 'compare-verdict';
-    if (cmp.diff === 0) {
-        verdict.textContent = 'Same score as BEN.';
+    if (!cmp) {
+        verdict.className = 'compare-note';
+        verdict.textContent = 'No result recorded - contract and auction only.';
+    } else if (cmp.diff === 0) {
+        verdict.textContent = `Same score as ${names.otherLong}.`;
     } else {
         verdict.classList.add(cmp.diff > 0 ? 'better' : 'worse');
-        verdict.textContent = `${cmp.diff > 0 ? 'Better' : 'Worse'} than BEN by ${Math.abs(cmp.diff)} points`
+        verdict.textContent = `${cmp.diff > 0 ? 'Better' : 'Worse'} than ${names.otherLong} by ${Math.abs(cmp.diff)} points`
             + ` (${signed(cmp.imps)}\u00a0IMP${Math.abs(cmp.imps) === 1 ? '' : 's'}).`;     // kept on one line
+        if (seat < 0) verdict.textContent = `N-S: ${verdict.textContent}`;
     }
 
-    ui.compareResult.replaceChildren(
-        table, verdict,
-        auctionLine('You', yours.auction, bens.auction, yours.dealer),
-        auctionLine('BEN', bens.auction, yours.auction, yours.dealer),
-    );
-    return { diff: cmp.diff, text: verdict.textContent };
+    const auctions = [auctionLine(names.you, yours.auction, bens.auction, yours.dealer)];
+    if (bens.auction.length) auctions.push(auctionLine(names.other, bens.auction, yours.auction, yours.dealer));
+    else {
+        const note = document.createElement('p');
+        note.className = 'compare-note';
+        note.textContent = `${names.other}: auction not recorded.`;
+        auctions.push(note);
+    }
+    target.replaceChildren(table, verdict, ...auctions);
+    return cmp;
 }
 
 function signed(n) {
@@ -615,7 +746,7 @@ function appendAction(parent, { kind, action }) {
 function appendCard(parent, card) {
     const suit = card[0];
     const pip = document.createElement('span');
-    pip.className = suit === 'H' || suit === 'D' ? 'suit red' : 'suit';
+    pip.className = `suit ${suitClass('SHDC'.indexOf(suit))}`;
     pip.textContent = SUIT_PIPS[suit];
     parent.append(pip, document.createTextNode(card[1] === 'T' ? '10' : card[1]));
 }

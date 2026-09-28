@@ -208,8 +208,10 @@ What it reads and does:
   Forced..., or You). The result is scored in the page, matching `src/scoring.py`.
 - An illegal or failed answer stops the deal without changing it; **Resume** or **Step** retries.
 
-Add `?debug=true` to the page URL for a **Debug** panel under the table that records every
-request to `gameapi.py`, including the hints and both halves of the comparison with BEN. Each row
+The **Debug** button in the header shows a panel under the table that records every
+request to `gameapi.py` (the choice is remembered; `?debug=true` or `?debug=false` in the URL
+overrides it). Requests are recorded all the time, so opening the panel mid-deal shows what has
+already happened - including the hints and both halves of the comparison with BEN. Each row
 shows time, what the request was for, endpoint, seat, BEN's answer (or the error), HTTP status and
 duration. Click a row for the full URL, the parameters and the JSON response. **Copy JSON** puts
 the whole log on the clipboard, or downloads it as a file where the clipboard is not available,

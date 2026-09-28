@@ -21,9 +21,10 @@ import {
 const SEAT_NAMES = ['North', 'East', 'South', 'West'];
 const SUIT_PIPS = { S: '♠', H: '♥', D: '♦', C: '♣' };
 const API_KEY = 'allwyn.apiBase';
-// ?debug=true (or 1, yes, on) shows the API request log under the table.
-const DEBUG = ['1', 'true', 'yes', 'on'].includes(
-    (new URLSearchParams(window.location.search).get('debug') || '').toLowerCase());
+// The API request log under the table. Requests are always recorded; this
+// only says whether the panel is shown. ?debug=true / ?debug=false in the URL
+// decides it; otherwise the header's Debug button does, remembered here.
+const DEBUG_KEY = 'allwyn.apiDebug';
 const DEBUG_MAX_ENTRIES = 500;
 const SEAT_KEY = 'allwyn.apiSeat';
 const TRICK_PAUSE_MS = 1200;
@@ -218,7 +219,7 @@ function loadBoard() {
 function makeApi() {
     return new BenApi(ui.api.value.trim(), {
         tournament: ui.tournament.value,
-        onTrace: DEBUG ? traceRequest : null,
+        onTrace: traceRequest,
     });
 }
 
@@ -632,8 +633,35 @@ const debugUi = {
     count: $('#debug-count'),
 };
 
-if (DEBUG && debugUi.panel) {
-    debugUi.panel.hidden = false;
+let debugShown = initialDebugShown();
+const debugToggle = $('#debug-toggle');
+paintDebugToggle();
+debugToggle?.addEventListener('click', () => {
+    debugShown = !debugShown;
+    try {
+        if (debugShown) localStorage.setItem(DEBUG_KEY, '1');
+        else localStorage.removeItem(DEBUG_KEY);
+    } catch (_) { /* nothing to remember it with */ }
+    paintDebugToggle();
+    if (debugShown) debugUi.panel?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+
+function initialDebugShown() {
+    const flag = (new URLSearchParams(window.location.search).get('debug') || '').toLowerCase();
+    if (['1', 'true', 'yes', 'on'].includes(flag)) return true;
+    if (['0', 'false', 'no', 'off'].includes(flag)) return false;
+    try { return localStorage.getItem(DEBUG_KEY) === '1'; } catch (_) { return false; }
+}
+
+function paintDebugToggle() {
+    if (debugUi.panel) debugUi.panel.hidden = !debugShown;
+    if (!debugToggle) return;
+    debugToggle.textContent = debugShown ? 'Hide Debug' : 'Debug';
+    debugToggle.setAttribute('aria-pressed', String(debugShown));
+    debugToggle.setAttribute('aria-label', debugShown ? 'Hide the API debug log' : 'Show the API debug log');
+}
+
+if (debugUi.panel) {
     $('#debug-clear')?.addEventListener('click', () => {
         debugEntries.length = 0;
         debugRows.clear();

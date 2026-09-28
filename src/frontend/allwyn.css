@@ -37,6 +37,18 @@
     --card-ink:      #1a1a1a;
     --card-red:      #c8102e;
 
+    /* Four-colour suits, so spades and clubs (and hearts and diamonds) are
+       told apart by colour as well as shape. Two sets: one for pips on a card
+       face, one for pips in text on the page. */
+    --face-s:        #1a1a1a;
+    --face-h:        #c8102e;
+    --face-d:        #d9480f;
+    --face-c:        #1b7a3a;
+    --pip-s:         #e6edf3;
+    --pip-h:         #ff6b6b;
+    --pip-d:         #ffa94d;
+    --pip-c:         #5fd38d;
+
     --radius-sm: 4px;
     --radius:    8px;
     --radius-lg: 14px;
@@ -59,8 +71,11 @@
     /* Geometry the layout reserves space from. A hand is one row per suit, so
        its height is fixed whatever the cards are - otherwise the felt slides up
        and down as suits empty during play. */
-    --card-w: 2.6rem;
-    --card-h: 3.7rem;
+    --card-w: 2.8rem;
+    --card-h: 4rem;
+    /* How much of each card in a fanned hand stays uncovered: the corner
+       index (rank over suit) has to fit inside it. */
+    --card-overlap: 1.25rem;
     /* East/West: four suit rows, plus 3 x 2px gaps and 2 x 4px padding, so the
        box is the same size empty as it is full. */
     --hand-h: calc(var(--card-h) * 4 + 14px);
@@ -68,7 +83,7 @@
     --table-w: 35.5rem;
     /* Wide enough for an eight-card suit at the current overlap, so East and
        West keep one width from deal to last trick. */
-    --side-hand-w: 13rem;
+    --side-hand-w: 14rem;
     --table-h: 23.5rem;
     --biddingbox-h: 7rem;
     /* The clear middle of the felt, which the auction panel occupies and the
@@ -110,6 +125,11 @@
         --card-ink:      #1a1a1a;
         --card-red:      #c8102e;
 
+        --pip-s:         #1a1a1a;
+        --pip-h:         #cf222e;
+        --pip-d:         #c2410c;
+        --pip-c:         #1a7f37;
+
         --shadow-sm: 0 1px 2px rgb(0 0 0 / 8%);
         --shadow:    0 4px 12px rgb(0 0 0 / 10%);
         --shadow-lg: 0 12px 32px rgb(0 0 0 / 16%);
@@ -135,6 +155,10 @@
     --green: #1a7f37;
     --amber: #9a6700;
     --card-bg: #ffffff;
+    --pip-s: #1a1a1a;
+    --pip-h: #cf222e;
+    --pip-d: #c2410c;
+    --pip-c: #1a7f37;
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 8%);
     --shadow: 0 4px 12px rgb(0 0 0 / 10%);
     --shadow-lg: 0 12px 32px rgb(0 0 0 / 16%);
@@ -572,16 +596,18 @@ a:hover { text-decoration: underline; }
     width: var(--card-w);
     height: var(--card-h);
     flex: 0 0 auto;
+    /* The suit sits under the rank in the top-left corner, as on a real card,
+       so the next card in a fanned hand never covers it. */
     display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    padding-bottom: 5px;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 1.55rem 0 0 5px;
     background: var(--card-bg);
     color: var(--card-ink);
     border: 1px solid rgb(0 0 0 / 18%);
     border-radius: 6px;
     box-shadow: var(--shadow-sm);
-    font-size: 1.35rem;
+    font-size: 1.45rem;
     font-weight: 700;
     line-height: 1;
     cursor: pointer;
@@ -593,20 +619,24 @@ a:hover { text-decoration: underline; }
 /* One row per suit. Declared here rather than relying on the inline
    display:flex the renderer sets, so the layout holds on its own. */
 .hand > div { display: flex; align-items: flex-start; min-height: var(--card-h); }
-.hand .card { margin-left: -1.15rem; }
+.hand .card { margin-left: calc(var(--card-overlap) * -1); }
 .hand div > .card:first-child { margin-left: 0; }
 
 .card::before {
     content: attr(data-value);
     position: absolute;
-    top: 4px;
+    top: 3px;
     left: 5px;
-    font-size: 1.05rem;
+    font-size: 1.3rem;
     font-weight: 800;
     font-family: var(--font-num);
 }
 
 .card.red { color: var(--card-red); }
+.card.suit-s { color: var(--face-s); }
+.card.suit-h { color: var(--face-h); }
+.card.suit-d { color: var(--face-d); }
+.card.suit-c { color: var(--face-c); }
 
 .card:hover, .card:focus-visible { translate: 0 -10px; box-shadow: var(--shadow); z-index: 5; }
 
@@ -653,6 +683,10 @@ a:hover { text-decoration: underline; }
 #auction tbody tr:last-child td { border-bottom: none; }
 #auction td:not(:empty) { color: var(--text); }
 #auction .red { color: var(--red); }
+#auction .suit-s { color: var(--pip-s); }
+#auction .suit-h { color: var(--pip-h); }
+#auction .suit-d { color: var(--pip-d); }
+#auction .suit-c { color: var(--pip-c); }
 
 /* Top-left corner of the cloth, mirroring the board number opposite. Outside
    the auction panel, so hiding the auction does not take the score with it. */
@@ -731,6 +765,11 @@ a:hover { text-decoration: underline; }
 /* Suit pips wherever engine text is shown: explanations and the hint dialog. */
 .suit { font-size: 1.05em; line-height: 1; }
 .suit.red { color: var(--red); }
+/* Suit pips in text - explanations, the auction, logs - in the four colours. */
+.suit-s:not(.card) { color: var(--pip-s); }
+.suit-h:not(.card) { color: var(--pip-h); }
+.suit-d:not(.card) { color: var(--pip-d); }
+.suit-c:not(.card) { color: var(--pip-c); }
 
 /* ------------------------------------------------------------ bidding box */
 
@@ -804,6 +843,11 @@ a:hover { text-decoration: underline; }
     pointer-events: none;
 }
 #bidding-suits .red { color: var(--card-red); }
+/* The strain tiles are little card faces: the card colours. */
+#bidding-suits .suit-s { color: var(--face-s); }
+#bidding-suits .suit-h { color: var(--face-h); }
+#bidding-suits .suit-d { color: var(--face-d); }
+#bidding-suits .suit-c { color: var(--face-c); }
 /* Dimmed rather than absent before a level is chosen, so the two-step bid is
    visible. Lighter than .invalid, which means "illegal call". */
 #bidding-suits.awaiting-level div { opacity: 0.55; }
@@ -891,6 +935,7 @@ dialog .buttons button { font: inherit; }
     #table { width: 100%; max-width: var(--table-w); height: 16rem; }
     #play-area { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); }
     #east, #west { width: auto; }
-    .card { width: 2.2rem; height: 3.1rem; }
-    .hand .card { margin-left: -0.9rem; }
+    .card { width: 2.4rem; height: 3.5rem; padding-top: 1.4rem; font-size: 1.25rem; }
+    .card::before { font-size: 1.15rem; }
+    .hand .card { margin-left: -1.05rem; }
 }

@@ -10,6 +10,15 @@
 import { SEATS, vulnerabilityLabel, scoreLine } from './allwyn.model.js';
 
 const SUIT_ENTITIES = ['♠', '♥', '♦', '♣']; // S H D C
+
+/**
+ * Class naming a suit's colour in the four-colour scheme: 'suit-s', 'suit-h',
+ * 'suit-d', 'suit-c' for SUITS index 0-3. 'red' is kept alongside on hearts
+ * and diamonds for anything still styled by it.
+ */
+export function suitClass(index) {
+    return `suit-${'shdc'[index]}`;
+}
 const SEAT_LABELS = ['.label-north', '.label-east', '.label-south', '.label-west'];
 
 /** Cache the elements we touch; ids come from allwyn.html. */
@@ -48,7 +57,7 @@ function clear(element) {
 
 function cardElement(card) {
     const el = document.createElement('div');
-    el.className = card.isRed ? 'card red' : 'card';
+    el.className = `card ${suitClass(card.suit)}${card.isRed ? ' red' : ''}`;
     el.dataset.value = card.rank;
     el.setAttribute('symbol', card.symbol);
     el.textContent = SUIT_ENTITIES[card.suit];
@@ -125,7 +134,7 @@ function formatCall(call) {
     } else {
         const index = 'SHDC'.indexOf(strain);
         symbol.textContent = SUIT_ENTITIES[index];
-        if (index === 1 || index === 2) symbol.className = 'red';
+        symbol.className = index === 1 || index === 2 ? `${suitClass(index)} red` : suitClass(index);
     }
     span.appendChild(symbol);
     return span;
@@ -215,7 +224,8 @@ function renderBiddingBox(state, dom) {
         ['bid-nt', 'N', 'NT', false],
     ].forEach(([className, symbol, glyph, red]) => {
         const el = document.createElement('div');
-        el.className = red ? `${className} red` : className;
+        const index = 'SHDC'.indexOf(symbol);
+        el.className = [className, index >= 0 ? suitClass(index) : '', red ? 'red' : ''].filter(Boolean).join(' ');
         el.setAttribute('symbol', symbol);
         el.textContent = glyph;
         suits.appendChild(el);
@@ -268,7 +278,7 @@ export function appendSuitText(parent, text) {
         if (i % 2 === 1) {
             const index = 'SHDC'.indexOf(part);
             const pip = document.createElement('span');
-            pip.className = index === 1 || index === 2 ? 'suit red' : 'suit';
+            pip.className = `suit ${suitClass(index)}${index === 1 || index === 2 ? ' red' : ''}`;
             pip.textContent = SUIT_ENTITIES[index];
             pip.setAttribute('aria-label', ['spades', 'hearts', 'diamonds', 'clubs'][index]);
             parent.appendChild(pip);

@@ -38,6 +38,8 @@ const ui = {
     restart: $('#restart-button'),
     progress: $('#progress'),
     compare: $('#compare'),
+    resultCompare: $('#result-compare'),
+    resultShowCompare: $('#result-show-compare'),
     compareStatus: $('#compare-status'),
     compareResult: $('#compare-result'),
     compareDecisions: $('#compare-decisions'),
@@ -189,6 +191,9 @@ function loadBoard() {
     ui.log.hidden = true;
     compared = false;
     ui.compare.hidden = true;
+    ui.resultCompare.hidden = true;
+    ui.resultCompare.className = 'result-compare';
+    ui.resultShowCompare.hidden = true;
     ui.compareStatus.textContent = '';
     ui.compareResult.replaceChildren();
     ui.compareDecisions.replaceChildren();
@@ -223,6 +228,8 @@ ui.step.addEventListener('click', () => {
 });
 
 ui.restart.addEventListener('click', loadBoard);
+
+ui.resultShowCompare.addEventListener('click', showComparison);
 
 $('#result-continue')?.addEventListener('click', () => {
     state.result = null;
@@ -372,33 +379,62 @@ async function compareWithBen() {
     const seat = humanSeat();
     const api = played.api;
 
+    // The panel sits at the top of a sidebar that scrolls on its own and is
+    // usually scrolled down to the latest log entry by now, so the progress
+    // also goes where you are looking: the result box and the progress line.
     ui.compare.hidden = false;
-    const status = (text) => { if (!cancelled()) ui.compareStatus.textContent = text; };
+    ui.resultCompare.hidden = false;
+    ui.resultShowCompare.hidden = false;
+    scrollSidebarToTop();
+    const status = (text) => {
+        if (cancelled()) return;
+        ui.compareStatus.textContent = text;
+        ui.resultCompare.textContent = text ? `Comparing with BEN: ${text}` : '';
+        ui.progress.textContent = text ? `Deal complete. Comparing with BEN: ${text}` : 'Deal complete.';
+    };
 
-    status('Asking BEN about your decisions...');
+    status('asking about your decisions...');
     const review = await reviewDecisions(played, api, {
         isCancelled: cancelled,
-        onProgress: (done, total) => status(`Asking BEN about your decisions: ${done} of ${total}...`),
+        onProgress: (done, total) => status(`your decision ${Math.min(done + 1, total)} of ${total}...`),
     });
     if (cancelled()) return;
     renderDecisions(review, played);
 
-    status("Playing the board with BEN at all four seats...");
+    status("BEN's own table, bidding...");
     let ben;
     try {
         ben = await playBenVersion(played.board, api, {
             isCancelled: cancelled,
             onStep: (_, r) => status(r.phase === 'bidding'
-                ? "BEN's table: bidding..."
-                : `BEN's table: trick ${Math.min(r.tricks.length + 1, 13)} of 13...`),
+                ? "BEN's own table, bidding..."
+                : `BEN's own table, trick ${Math.min(r.tricks.length + 1, 13)} of 13...`),
         });
     } catch (error) {
-        status(`Could not play BEN's version: ${error.message}`);
+        status('');
+        ui.compareStatus.textContent = `Could not play BEN's version: ${error.message}`;
+        ui.resultCompare.textContent = "Could not finish the comparison with BEN - see the panel.";
         return;
     }
     if (cancelled() || !ben) return;
-    renderTables(played, ben, seat);
+    const verdict = renderTables(played, ben, seat);
     status('');
+    ui.resultCompare.textContent = verdict.text;
+    ui.resultCompare.classList.toggle('better', verdict.diff > 0);
+    ui.resultCompare.classList.toggle('worse', verdict.diff < 0);
+    ui.progress.textContent = 'Deal complete. See You vs BEN.';
+    scrollSidebarToTop();
+}
+
+/** The panel is at the top of the sidebar, which scrolls on its own. */
+function scrollSidebarToTop() {
+    $('#sidebar')?.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/** The result box's button: the panel into view, wherever the layout has put it. */
+function showComparison() {
+    scrollSidebarToTop();
+    ui.compare.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 /** Your table and BEN's side by side: contract, tricks, score, and the auctions. */
@@ -447,6 +483,7 @@ function renderTables(yours, bens, seat) {
         auctionLine('You', yours.auction, bens.auction, yours.dealer),
         auctionLine('BEN', bens.auction, yours.auction, yours.dealer),
     );
+    return { diff: cmp.diff, text: verdict.textContent };
 }
 
 function signed(n) {

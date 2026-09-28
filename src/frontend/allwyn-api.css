@@ -115,6 +115,13 @@
 
 /* --------------------------------------------------------------- comparison */
 
+/* On the result box on the felt: the comparison's progress, then its verdict. */
+.result-compare { font-size: 0.9rem; font-weight: 600; color: rgb(255 255 255 / 80%); max-width: 18rem; }
+.result-compare.better { color: #6fdc8c; }
+.result-compare.worse  { color: #ff8f8f; }
+.result-buttons { display: flex; gap: var(--space-2); justify-content: center; }
+.result-buttons .btn[hidden] { display: none; }
+
 .compare-status { margin: 0 0 var(--space-2); font-size: 0.85rem; color: var(--text-muted); }
 .compare-status:empty { display: none; }
 

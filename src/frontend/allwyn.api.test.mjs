@@ -18,7 +18,9 @@ import {
 } from './allwyn.api.js';
 import { GameState } from './allwyn.state.js';
 import { Card, Trick } from './allwyn.model.js';
-import { tableResult, scorecardRow, weThey, resultText, totals, toCsv } from './allwyn.scorecard.js';
+import {
+    tableResult, scorecardRow, weThey, resultText, totals, toCsv, contractText, outcomeText, boardLines,
+} from './allwyn.scorecard.js';
 
 const results = [];
 async function check(name, fn) {
@@ -431,15 +433,22 @@ await check('a human seat: step() waits, submit validates, declarer plays dummy 
     assert.equal(runner.played.length, 52);
 });
 
-await check('a human defender makes the opening lead; a human dummy only watches', async () => {
+await check('a defender leads; a dummy declares for their partner, or watches if asked to', async () => {
     const board = parsePbn(PBN).boards[0];
+    // South declares 3NT: North is dummy.
     const script = ['PASS', '1C', '1S', 'PASS', '2C', 'PASS', '3N', 'PASS', 'PASS', 'PASS'];
-    for (const [human, expectedCards] of [[3, 13], [0, 0]]) {
+    const cases = [
+        { human: 3, options: {}, cards: 13, seats: [3] },                              // West defends
+        { human: 0, options: {}, cards: 26, seats: [0, 2] },                           // North plays S and N
+        { human: 0, options: { partnerDeclares: 'watch' }, cards: 0, seats: [] },      // North only watches
+    ];
+    for (const { human, options, cards: expected, seats } of cases) {
         let runner;
-        const bidScript = [...script];
-        runner = new DealRunner(board, fakeApi(board, bidScript, () => runner, []), { humanSeats: [human] });
+        const calls = [];
+        runner = new DealRunner(board, fakeApi(board, [...script], () => runner, calls), { humanSeats: [human], ...options });
         let cards = 0;
         let firstCardInput = null;
+        const played = new Set();
         while (!runner.done) {
             const outcome = await runner.step();
             if (outcome.kind !== 'input') continue;
@@ -447,10 +456,15 @@ await check('a human defender makes the opening lead; a human dummy only watches
             else {
                 firstCardInput ??= runner.phase;
                 cards += 1;
+                played.add(outcome.seat);
                 runner.submitCard(runner.legalCards(outcome.seat)[0]);
             }
         }
-        assert.equal(cards, expectedCards, `seat ${human}`);
+        const name = `seat ${human} ${JSON.stringify(options)}`;
+        assert.equal(cards, expected, name);
+        assert.deepEqual([...played].sort(), seats, name);
+        // BEN is never asked for a card the person played.
+        assert.ok(!calls.some((c) => c[0] === 'play' && played.has(c[2])), name);
         if (human === 3) assert.equal(firstCardInput, 'lead', 'West, on declarer\'s left, leads');
     }
 });
@@ -652,11 +666,28 @@ await check('scorecard: We/They by seat, result text, totals and CSV', () => {
         ben: { we: 400, they: 0 },
     });
 
+    assert.equal(contractText(rows[0].ours), '3DN');
+    assert.equal(outcomeText(rows[0].ours), '-1');
+    assert.equal(contractText(rows[2].ours), 'Pass');
+    assert.equal(outcomeText(rows[2].ours), '');
+    assert.equal(outcomeText(tableResult(c(2, 'S', 2), null, null)), '');
+    assert.deepEqual(boardLines(rows[0]).map((l) => l.label), ['You', 'Recorded', 'BEN']);
+    const allFour = scorecardRow({ key: 'b9', board: '9', label: 'Board 9', seat: -1, ours: tableResult(null, null, 0) });
+    assert.deepEqual(boardLines(allFour).map((l) => l.label), ['BEN (all four)', 'Recorded']);
+
     const csv = toCsv(rows).trim().split('\n');
-    assert.equal(csv[0], 'Board,Played as,Result,We,They,Recorded result,Recorded We,Recorded They,BEN result,BEN We,BEN They');
-    assert.equal(csv[1], '1,S,3DN-1,,50,3DN=,110,,3NTS=,400,');
-    assert.equal(csv[2], '2,S,3SE=,,140,,,,,,');
-    assert.equal(csv[3], '5,S,Pass,,,1NTE=,,90,,,');
+    assert.deepEqual(csv, [
+        'Board,Played as,Table,Contract,Result,We,They',
+        '1,S,You,3DN,-1,,50',
+        '1,S,Recorded,3DN,=,110,',
+        '1,S,BEN,3NTS,=,400,',
+        '2,S,You,3SE,=,,140',
+        '2,S,Recorded,,,,',
+        '2,S,BEN,,,,',
+        '5,S,You,Pass,,,',
+        '5,S,Recorded,1NTE,=,,90',
+        '5,S,BEN,,,,',
+    ]);
 });
 
 /* ---------------------------------------------------------- files on disk */

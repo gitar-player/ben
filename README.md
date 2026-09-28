@@ -176,8 +176,9 @@ With a seat of your own:
   the deal ends.
 - When it is your call the bidding box appears (level, then strain; **Hint** shows what BEN
   would call and what it considered). Your call is explained through `/explain` like BEN's.
-- When it is your card, click it. If you declare you also play dummy's cards; if you are dummy,
-  BEN declares and you watch.
+- When it is your card, click it. If you declare you also play dummy's cards. If your partner
+  declares, you play the hand for them - declarer's cards and your own as dummy - as on BBO with
+  a robot partner, and partner's hand is shown from the end of the auction.
 - After your call or card BEN carries on by itself; **Pause** stops it between actions.
 - If the file records how the board went at the table - PBN `[Contract]`, `[Declarer]`,
   `[Result]`, `[Auction]` and `[Play]` (tricks are counted from the play when there is no
@@ -218,13 +219,15 @@ What it reads and does:
   Forced..., or You). The result is scored in the page, matching `src/scoring.py`.
 - An illegal or failed answer stops the deal without changing it; **Resume** or **Step** retries.
 
-A **Scorecard** under the table keeps one row per board played from the loaded file: the board,
-your table's result (e.g. `3♦N-1`, `Pass`), and We / They scores for your table, the table
-recorded in the file and BEN's table, with totals. "We" is your side (North-South when BEN plays
-all four). Scores go in the column of the side that scored; `--` means that table has no score
-yet - nothing recorded in the file, or BEN not compared. Playing a board again replaces its row.
-The scorecard is kept in the browser for each file name, so it survives a reload; **Download
-CSV** saves it (with every table's result written out) and **Clear** starts it again.
+A **Scorecard** under the table keeps every board played from the loaded file, the latest at the
+bottom. Each board has a line for **You**, the **Recorded** table in the file, and **BEN**'s
+table, each with the contract and declarer (e.g. `3♦N`, `Pass`), the result (`=`, `+2`, `-1`)
+and the score under **We** or **They** - whichever side scored. "We" is your side (North-South
+when BEN plays all four, when the board has no separate BEN line). A table with nothing yet says
+so - *not in file*, or *not compared yet* until you compare with BEN - and a total per table is
+kept at the bottom. Playing a board again replaces it. The scorecard is kept in the browser for
+each file name, so it survives a reload; **Download CSV** saves it in the same layout (a line per
+table per board) and **Clear** starts it again.
 
 The **Debug** button in the header shows a panel under the table that records every
 request to `gameapi.py` (the choice is remembered; `?debug=true` or `?debug=false` in the URL

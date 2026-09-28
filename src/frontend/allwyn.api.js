@@ -259,16 +259,24 @@ function apiVul(vul) {
  * `humanSeats` are the seat indices a person plays. When one of them is to
  * act, step() asks BEN nothing and resolves to {kind: 'input'}; the page then
  * hands the decision in with submitCall() or submitCard(). A person who
- * declares also plays dummy's cards, as declarer does at the table; one who is
- * dummy watches BEN declare.
+ * declares also plays dummy's cards, as declarer does at the table. One whose
+ * partner declares plays the hand for them - declarer's cards and their own,
+ * now dummy's - as BBO does with a robot partner, rather than watching BEN
+ * play it; `partnerDeclares: 'watch'` keeps them as dummy instead.
  */
 export class DealRunner {
-    constructor(board, api, { emit = () => {}, log = () => {}, localForcedPlays = true, humanSeats = [] } = {}) {
+    constructor(board, api, {
+        emit = () => {}, log = () => {}, localForcedPlays = true, humanSeats = [], partnerDeclares = 'play',
+    } = {}) {
         this.board = board;
         this.api = api;
         this.emit = emit;
         this.log = log;
         this.humanSeats = new Set(humanSeats);
+        this.partnerDeclares = partnerDeclares;
+        // The seats whose cards a person decides, once the contract is known:
+        // their own, and declarer's too when they are dummy. Set by endAuction().
+        this.humanCardSeats = new Set();
         // A card that is the only legal play is played without asking BEN -
         // one fewer round trip, and the same thing gameapi.py does ("Forced").
         this.localForcedPlays = localForcedPlays;
@@ -316,7 +324,9 @@ export class DealRunner {
         } else {
             return null;
         }
-        const human = this.humanSeats.has(need === 'card' ? this.controller(seat) : seat);
+        const human = need === 'card'
+            ? this.humanCardSeats.has(this.controller(seat))
+            : this.humanSeats.has(seat);
         return { seat, need, human };
     }
 
@@ -420,6 +430,10 @@ export class DealRunner {
             return;
         }
         const { declarer, strain } = this.contract;
+        this.humanCardSeats = new Set(this.humanSeats);
+        if (this.partnerDeclares === 'play' && this.humanSeats.has((declarer + 2) % 4)) {
+            this.humanCardSeats.add(declarer);
+        }
         this.emit({
             message: 'auction_end',
             auction: [...this.auction],

@@ -128,31 +128,39 @@
 
 #scorecard-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; font-variant-numeric: tabular-nums; }
 #scorecard-table th, #scorecard-table td {
-    padding: 6px 10px;
-    border: 1px solid var(--border);
+    padding: 5px 10px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
     text-align: left;
     white-space: nowrap;
 }
 #scorecard-table thead th {
     position: sticky;
+    top: 0;
+    z-index: 1;
     background: var(--felt);
     color: #fff;
     font-weight: 700;
 }
-#scorecard-table thead tr:first-child th { top: 0; }
-#scorecard-table thead tr:nth-child(2) th { top: 2.1rem; }
-#scorecard-table th.sc-group { text-align: center; }
-#scorecard-table .sc-num { text-align: right; min-width: 4.2rem; }
-#scorecard-table td.sc-board { text-align: center; }
-#scorecard-table td.sc-result { font-weight: 700; }
-#scorecard-table td.sc-none { color: var(--text-faint); text-align: center; }
-#scorecard-table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--bg-sunken) 60%, transparent); }
-#scorecard-table tfoot td { font-weight: 800; border-top: 2px solid var(--border-strong); }
-/* The groups after your own table, set off by a heavier rule. */
-#scorecard-table td:nth-child(5), #scorecard-table td:nth-child(7),
-#scorecard-table thead tr:nth-child(2) th:nth-child(3), #scorecard-table thead tr:nth-child(2) th:nth-child(5) {
-    border-left: 2px solid var(--border-strong);
+#scorecard-table .sc-num { text-align: right; min-width: 4.5rem; }
+/* Each board is its own <tbody>: a heavier rule between boards, and the
+   board number once, down the side of its lines. */
+#scorecard-table tbody + tbody tr:first-child > * { border-top: 2px solid var(--border-strong); }
+#scorecard-table td.sc-board {
+    text-align: center;
+    vertical-align: middle;
+    font-weight: 800;
+    font-size: 1.05rem;
+    border-right: 1px solid var(--border);
 }
+#scorecard-table td.sc-table { color: var(--text-muted); font-size: 0.85rem; }
+#scorecard-table tr.sc-ours td.sc-table { color: var(--text); font-weight: 700; }
+#scorecard-table td.sc-contract { font-weight: 700; }
+#scorecard-table td.sc-missing { color: var(--text-faint); font-style: italic; font-weight: 500; }
+#scorecard-table tr.sc-ours td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+#scorecard-table tr.sc-ours td.sc-board { background: none; }
+#scorecard-table tfoot td { font-weight: 800; border-bottom: none; }
+#scorecard-table tfoot tr:first-child td { border-top: 2px solid var(--border-strong); }
+#scorecard-table tfoot td.sc-table { font-weight: 700; }
 
 /* -------------------------------------------------------------------- debug */
 

@@ -153,8 +153,9 @@
             <div id="south" class="hand" aria-label="South hand"></div>
         </div>
 
-        <!-- One row per board played from this file: your table, the recorded
-             one and BEN's, each as We / They. Kept in the browser per file. -->
+        <!-- For each board played from this file, a line for your table, the
+             recorded one and BEN's: contract, result, We / They. Kept in the
+             browser per file. -->
         <section id="scorecard" class="panel" aria-label="Scorecard" hidden>
             <div class="scorecard-head">
                 <h2>Scorecard</h2>
@@ -166,19 +167,15 @@
                 <table id="scorecard-table">
                     <thead>
                         <tr>
-                            <th rowspan="2" class="sc-board">Board</th>
-                            <th rowspan="2" class="sc-result">Result</th>
-                            <th colspan="2" class="sc-group">Your table</th>
-                            <th colspan="2" class="sc-group">Recorded</th>
-                            <th colspan="2" class="sc-group">BEN</th>
-                        </tr>
-                        <tr>
-                            <th class="sc-num">We</th><th class="sc-num">They</th>
-                            <th class="sc-num">We</th><th class="sc-num">They</th>
-                            <th class="sc-num">We</th><th class="sc-num">They</th>
+                            <th class="sc-board">Board</th>
+                            <th>Table</th>
+                            <th>Contract</th>
+                            <th>Result</th>
+                            <th class="sc-num">We</th>
+                            <th class="sc-num">They</th>
                         </tr>
                     </thead>
-                    <tbody id="scorecard-body"></tbody>
+                    <!-- One <tbody> per board, added at the bottom as boards are played. -->
                     <tfoot id="scorecard-foot"></tfoot>
                 </table>
             </div>

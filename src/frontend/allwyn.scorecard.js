@@ -1,7 +1,7 @@
 /**
- * The session scorecard for allwyn-api.html: one row per board played, with
- * the score at your table, at the table recorded in the file, and at BEN's
- * table, each split into We and They. No DOM, no storage - allwyn.apimain.js
+ * The session scorecard for allwyn-api.html: for each board played, a line
+ * for your table, the table recorded in the file and BEN's table - contract,
+ * result, and the score split into We and They. No DOM, no storage - allwyn.apimain.js
  * does those - so the arithmetic can be tested under node.
  *
  * A row keeps each table's result as {contract, tricks, score}, where
@@ -59,6 +59,34 @@ function madeText(level, tricks) {
     return over === 0 ? '=' : over > 0 ? `+${over}` : `-${-over}`;
 }
 
+/** The contract with its declarer, "3DN", "4SXW", "3NTS", or "Pass". */
+export function contractText(result, suitText = (s) => (s === 'N' ? 'NT' : s)) {
+    if (!result) return '';
+    if (!result.contract) return 'Pass';
+    const { level, strain, doubling, declarer } = result.contract;
+    return `${level}${suitText(strain)}${doubling}${SEATS[declarer]}`;
+}
+
+/** How the contract went: "=", "+2", "-1"; empty when passed out or not known. */
+export function outcomeText(result) {
+    if (!result?.contract || result.tricks === null) return '';
+    return madeText(result.contract.level, result.tricks);
+}
+
+/**
+ * The lines a board shows, in order: your table, the recorded one, BEN's.
+ * With BEN at all four seats the first line is BEN's own table already, so
+ * there is no separate BEN line.
+ */
+export function boardLines(row) {
+    const lines = [
+        { table: 'ours', label: row.seat < 0 ? 'BEN (all four)' : 'You', result: row.ours, missing: '' },
+        { table: 'recorded', label: 'Recorded', result: row.recorded, missing: 'not in file' },
+    ];
+    if (row.seat >= 0) lines.push({ table: 'ben', label: 'BEN', result: row.ben, missing: 'not compared yet' });
+    return lines;
+}
+
 /** Column totals for We and They at each table, over rows that have that table. */
 export function totals(rows) {
     const sum = { ours: { we: 0, they: 0 }, recorded: { we: 0, they: 0 }, ben: { we: 0, they: 0 } };
@@ -73,28 +101,30 @@ export function totals(rows) {
     return sum;
 }
 
-/** The scorecard as CSV, one line per board, results in letters. */
+/**
+ * The scorecard as CSV, laid out as the page shows it: a line per table per
+ * board (You, Recorded, BEN), contracts in letters. A table with nothing to
+ * show - not in the file, BEN not asked - has its line with empty cells.
+ */
 export function toCsv(rows) {
-    const header = ['Board', 'Played as', 'Result', 'We', 'They',
-        'Recorded result', 'Recorded We', 'Recorded They', 'BEN result', 'BEN We', 'BEN They'];
+    const header = ['Board', 'Played as', 'Table', 'Contract', 'Result', 'We', 'They'];
     const cell = (v) => {
         const text = v === null || v === undefined ? '' : String(v);
         return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
     };
     const lines = [header.map(cell).join(',')];
     for (const row of rows) {
-        const split = (table) => weThey(row[table]?.score, row.seat) ?? { we: null, they: null };
-        const ours = split('ours');
-        const rec = split('recorded');
-        const ben = split('ben');
-        lines.push([
-            row.board || row.label,
-            row.seat < 0 ? 'BEN (all four)' : SEATS[row.seat],
-            resultText(row.ours),
-            ours.we, ours.they,
-            resultText(row.recorded), rec.we, rec.they,
-            resultText(row.ben), ben.we, ben.they,
-        ].map(cell).join(','));
+        for (const line of boardLines(row)) {
+            const split = weThey(line.result?.score, row.seat) ?? { we: null, they: null };
+            lines.push([
+                row.board || row.label,
+                row.seat < 0 ? 'BEN (all four)' : SEATS[row.seat],
+                line.label,
+                contractText(line.result),
+                outcomeText(line.result),
+                split.we, split.they,
+            ].map(cell).join(','));
+        }
     }
     return lines.join('\n') + '\n';
 }

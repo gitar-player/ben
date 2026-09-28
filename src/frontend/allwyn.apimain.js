@@ -13,7 +13,9 @@ import { Card, parseContract, contractOutcome, scoreLine } from './allwyn.model.
 import { GameState } from './allwyn.state.js';
 import { collectDom, render, appendCall, appendSuitText, suitClass } from './allwyn.render.js';
 import { initTheme } from './allwyn.theme.js';
-import { tableResult, scorecardRow, weThey, resultText, totals, toCsv } from './allwyn.scorecard.js';
+import {
+    tableResult, scorecardRow, weThey, totals, toCsv, contractText, outcomeText, boardLines,
+} from './allwyn.scorecard.js';
 import { parseDealFile } from './allwyn.dealfile.js';
 import {
     BenApi, DealRunner, reviewDecisions, playBenVersion, compareResults, contractString,
@@ -76,8 +78,9 @@ state.subscribe(() => render(state, dom));
  * Which hands are on show. GameState's own rule is written for the
  * gameserver, which never sends the hands a player may not see; here the
  * browser holds all four, so the rule has to be strict: with nobody playing,
- * every hand; otherwise your own, dummy once the lead is made, and the lot
- * when the deal is over.
+ * every hand; otherwise your own, any hand you are playing the cards of
+ * (partner's, when you declare for them), dummy once the lead is made, and
+ * the lot when the deal is over.
  */
 state.updateRevealed = () => {
     const human = humanSeat();
@@ -85,7 +88,7 @@ state.updateRevealed = () => {
         state.revealed = new Set([0, 1, 2, 3]);
         return;
     }
-    const shown = new Set([human]);
+    const shown = new Set([human, ...runner.humanCardSeats]);
     if (state.deal?.dummy !== undefined) shown.add(state.deal.dummy);
     state.revealed = shown;
 };
@@ -396,7 +399,9 @@ function paintControls(thinking = '') {
 function yourTurnText({ seat, need }) {
     if (need === 'bid') return 'Your call.';
     if (runner.phase === 'lead') return 'Your lead.';
-    return seat === runner.dummy ? 'Your play - from dummy.' : 'Your play.';
+    if (seat === runner.dummy) return `Your play - from dummy (${SEAT_NAMES[seat]}).`;
+    if (seat !== humanSeat()) return `Your play - for ${SEAT_NAMES[seat]}, declaring for your partner.`;
+    return 'Your play.';
 }
 
 function setStatus(status, detail) {
@@ -719,7 +724,8 @@ function renderDecisions(review, played) {
             ? `Your call ${callNumber}`
             : d.index === 0
                 ? 'Opening lead'
-                : `Trick ${Math.floor(d.index / 4) + 1}${d.seat === played.dummy ? ', from dummy' : ''}`;
+                : `Trick ${Math.floor(d.index / 4) + 1}${d.seat === played.dummy ? ', from dummy'
+                    : d.seat !== humanSeat() ? `, for ${SEAT_NAMES[d.seat]}` : ''}`;
         item.appendChild(where);
 
         const yours = document.createElement('span');
@@ -767,7 +773,7 @@ const SCORECARD_KEY = 'allwyn.scorecard';
 const scorecardUi = {
     panel: $('#scorecard'),
     file: $('#scorecard-file'),
-    body: $('#scorecard-body'),
+    table: $('#scorecard-table'),
     foot: $('#scorecard-foot'),
 };
 
@@ -834,62 +840,81 @@ function renderScorecard() {
     const rows = scorecardRows();
     scorecardUi.panel.hidden = rows.length === 0;
     scorecardUi.file.textContent = fileName;
-    scorecardUi.body.replaceChildren(...rows.map(scorecardLine));
+    // A <tbody> per board, in the order played - the latest at the bottom.
+    scorecardUi.table.querySelectorAll('tbody').forEach((body) => body.remove());
+    for (const row of rows) scorecardUi.table.insertBefore(scorecardBoard(row), scorecardUi.foot);
+    scorecardUi.foot.replaceChildren(...scorecardTotals(rows));
+    const scroll = scorecardUi.table.parentElement;
+    scroll.scrollTop = scroll.scrollHeight;
+}
 
+/** One board: a line each for your table, the recorded one and BEN's. */
+function scorecardBoard(row) {
+    const body = document.createElement('tbody');
+    const lines = boardLines(row);
+    lines.forEach((line, i) => {
+        const tr = document.createElement('tr');
+        tr.className = `sc-${line.table}`;
+        if (i === 0) {
+            const board = document.createElement('td');
+            board.className = 'sc-board';
+            board.rowSpan = lines.length;
+            board.textContent = row.board || row.label;
+            board.title = `${row.label}${row.seat < 0 ? ' - BEN played all four' : ` - you played ${SEAT_NAMES[row.seat]}`}`;
+            tr.appendChild(board);
+        }
+        tr.appendChild(cell('sc-table', line.label));
+
+        if (!line.result) {
+            // Nothing for this table yet: not recorded in the file, or BEN not asked.
+            const missing = cell('sc-missing', line.missing);
+            missing.colSpan = 4;
+            tr.appendChild(missing);
+        } else {
+            const contract = cell('sc-contract', '');
+            appendContractText(contract, line.result);
+            tr.appendChild(contract);
+            tr.appendChild(cell('sc-result', outcomeText(line.result)));
+            const split = weThey(line.result.score, row.seat);
+            tr.appendChild(cell('sc-num', split?.we ?? ''));
+            tr.appendChild(cell('sc-num', split?.they ?? ''));
+        }
+        body.appendChild(tr);
+    });
+    return body;
+}
+
+/** A total line per table that has any scores. */
+function scorecardTotals(rows) {
     const sum = totals(rows);
-    const foot = document.createElement('tr');
-    const label = document.createElement('td');
-    label.colSpan = 2;
-    label.textContent = 'Total';
-    foot.appendChild(label);
+    const labels = { ours: 'You', recorded: 'Recorded', ben: 'BEN' };
+    if (rows.length && rows.every((r) => r.seat < 0)) labels.ours = 'BEN (all four)';
+    const lines = [];
     for (const table of ['ours', 'recorded', 'ben']) {
-        const any = rows.some((r) => Number.isFinite(r[table]?.score));
-        for (const side of ['we', 'they']) {
-            const td = document.createElement('td');
-            td.className = 'sc-num';
-            td.textContent = any ? String(sum[table][side]) : '';
-            foot.appendChild(td);
-        }
+        if (!rows.some((r) => Number.isFinite(r[table]?.score))) continue;
+        const tr = document.createElement('tr');
+        tr.appendChild(cell('', lines.length === 0 ? 'Total' : ''));
+        tr.appendChild(cell('sc-table', labels[table]));
+        const blank = cell('', '');
+        blank.colSpan = 2;
+        tr.appendChild(blank);
+        tr.appendChild(cell('sc-num', sum[table].we));
+        tr.appendChild(cell('sc-num', sum[table].they));
+        lines.push(tr);
     }
-    scorecardUi.foot.replaceChildren(foot);
+    return lines;
 }
 
-function scorecardLine(row) {
-    const tr = document.createElement('tr');
-    const board = document.createElement('td');
-    board.className = 'sc-board';
-    board.textContent = row.board || row.label;
-    board.title = `${row.label}${row.seat < 0 ? ' - BEN played all four' : ` - you played ${SEAT_NAMES[row.seat]}`}`;
-    tr.appendChild(board);
-
-    const result = document.createElement('td');
-    result.className = 'sc-result';
-    appendResult(result, row.ours);
-    tr.appendChild(result);
-
-    for (const table of ['ours', 'recorded', 'ben']) {
-        const split = weThey(row[table]?.score, row.seat);
-        const title = row[table] ? resultText(row[table]) : '';
-        for (const side of ['we', 'they']) {
-            const td = document.createElement('td');
-            if (!split) {
-                // Not played there (BEN not asked yet) or no result recorded.
-                td.className = 'sc-none';
-                td.textContent = '--';
-            } else {
-                td.className = 'sc-num';
-                td.textContent = split[side] === null ? '' : String(split[side]);
-            }
-            if (title) td.title = title;
-            tr.appendChild(td);
-        }
-    }
-    return tr;
+function cell(className, text) {
+    const td = document.createElement('td');
+    if (className) td.className = className;
+    td.textContent = String(text);
+    return td;
 }
 
-/** "3♦N-1", with the pip coloured, or "Pass". */
-function appendResult(parent, result) {
-    const text = resultText(result, (strain) => `\u0000${strain}\u0000`);
+/** "3♦N", with the pip coloured, or "Pass". */
+function appendContractText(parent, result) {
+    const text = contractText(result, (strain) => `\u0000${strain}\u0000`);
     for (const [i, part] of text.split('\u0000').entries()) {
         if (i % 2 === 1) {
             if (part === 'N') parent.appendChild(document.createTextNode('NT'));

@@ -218,6 +218,14 @@ What it reads and does:
   Forced..., or You). The result is scored in the page, matching `src/scoring.py`.
 - An illegal or failed answer stops the deal without changing it; **Resume** or **Step** retries.
 
+A **Scorecard** under the table keeps one row per board played from the loaded file: the board,
+your table's result (e.g. `3♦N-1`, `Pass`), and We / They scores for your table, the table
+recorded in the file and BEN's table, with totals. "We" is your side (North-South when BEN plays
+all four). Scores go in the column of the side that scored; `--` means that table has no score
+yet - nothing recorded in the file, or BEN not compared. Playing a board again replaces its row.
+The scorecard is kept in the browser for each file name, so it survives a reload; **Download
+CSV** saves it (with every table's result written out) and **Clear** starts it again.
+
 The **Debug** button in the header shows a panel under the table that records every
 request to `gameapi.py` (the choice is remembered; `?debug=true` or `?debug=false` in the URL
 overrides it). Requests are recorded all the time, so opening the panel mid-deal shows what has

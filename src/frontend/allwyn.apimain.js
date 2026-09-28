@@ -13,6 +13,7 @@ import { Card, parseContract, contractOutcome, scoreLine } from './allwyn.model.
 import { GameState } from './allwyn.state.js';
 import { collectDom, render, appendCall, appendSuitText, suitClass } from './allwyn.render.js';
 import { initTheme } from './allwyn.theme.js';
+import { tableResult, scorecardRow, weThey, resultText, totals, toCsv } from './allwyn.scorecard.js';
 import { parseDealFile } from './allwyn.dealfile.js';
 import {
     BenApi, DealRunner, reviewDecisions, playBenVersion, compareResults, contractString,
@@ -95,6 +96,7 @@ function humanSeat() {
 }
 
 let boards = [];
+let fileName = '';            // the deal file loaded, whose scorecard is shown
 let runner = null;
 let running = false;          // playing continuously, as opposed to stepping
 let driving = false;          // drive() is running, perhaps paused between steps
@@ -152,6 +154,8 @@ ui.file.addEventListener('change', async () => {
     }
 
     boards = parsed.boards;
+    fileName = file.name;
+    renderScorecard();
     ui.board.replaceChildren(...boards.map((board, i) => {
         const option = document.createElement('option');
         option.value = String(i);
@@ -413,6 +417,7 @@ function onDealEnd() {
     dealEndHandled = true;
     const seat = humanSeat();
     const recorded = runner.board.recorded;
+    recordOnScorecard(runner, seat);
     if (!recorded && seat < 0) return;
 
     ui.compare.hidden = false;
@@ -521,6 +526,9 @@ async function compareWithBen() {
     if (cancelled() || !ben) return;
     renderTables(ui.compareResult, played, ben, seat, { you: 'You', other: 'BEN', otherLong: 'BEN' });
     resultRow(ui.resultBenRow, ben, played, seat);
+    updateScorecard(scorecardKey(played.board), {
+        ben: tableResult(ben.contract, ben.result.tricks_taken, ben.result.score),
+    });
     status('');
     ui.resultCompare.hidden = true;           // the row says it now
     ui.progress.textContent = 'Deal complete. See the comparison.';
@@ -749,6 +757,147 @@ function appendCard(parent, card) {
     pip.className = `suit ${suitClass('SHDC'.indexOf(suit))}`;
     pip.textContent = SUIT_PIPS[suit];
     parent.append(pip, document.createTextNode(card[1] === 'T' ? '10' : card[1]));
+}
+
+/* ------------------------------------------------------------- scorecard */
+
+// Saved in the browser, one list of rows per deal file, so a session's
+// scorecard survives a reload and each file keeps its own.
+const SCORECARD_KEY = 'allwyn.scorecard';
+const scorecardUi = {
+    panel: $('#scorecard'),
+    file: $('#scorecard-file'),
+    body: $('#scorecard-body'),
+    foot: $('#scorecard-foot'),
+};
+
+function loadScorecards() {
+    try { return JSON.parse(localStorage.getItem(SCORECARD_KEY) || '{}') || {}; } catch (_) { return {}; }
+}
+
+let scorecards = loadScorecards();
+
+function saveScorecards() {
+    try { localStorage.setItem(SCORECARD_KEY, JSON.stringify(scorecards)); } catch (_) { /* kept for this visit only */ }
+}
+
+function scorecardRows() {
+    return scorecards[fileName] ?? [];
+}
+
+function scorecardKey(board) {
+    return board.label;
+}
+
+/** A finished deal onto the scorecard - replacing the row if the board was played before. */
+function recordOnScorecard(played, seat) {
+    const board = played.board;
+    const recorded = board.recorded;
+    const row = scorecardRow({
+        key: scorecardKey(board),
+        board: board.board,
+        label: board.label,
+        seat,
+        ours: tableResult(played.contract, played.result.tricks_taken, played.result.score),
+        recorded: recorded ? tableResult(recorded.contract, recorded.tricks, recorded.score) : null,
+    });
+    const rows = scorecardRows().filter((r) => r.key !== row.key);
+    rows.push(row);
+    scorecards[fileName] = rows;
+    saveScorecards();
+    renderScorecard();
+}
+
+function updateScorecard(key, changes) {
+    const row = scorecardRows().find((r) => r.key === key);
+    if (!row) return;
+    Object.assign(row, changes);
+    saveScorecards();
+    renderScorecard();
+}
+
+$('#scorecard-clear')?.addEventListener('click', () => {
+    delete scorecards[fileName];
+    saveScorecards();
+    renderScorecard();
+});
+
+$('#scorecard-csv')?.addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([toCsv(scorecardRows())], { type: 'text/csv' }));
+    link.download = `${(fileName || 'deals').replace(/\.[^.]+$/, '')}-scorecard.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+});
+
+function renderScorecard() {
+    const rows = scorecardRows();
+    scorecardUi.panel.hidden = rows.length === 0;
+    scorecardUi.file.textContent = fileName;
+    scorecardUi.body.replaceChildren(...rows.map(scorecardLine));
+
+    const sum = totals(rows);
+    const foot = document.createElement('tr');
+    const label = document.createElement('td');
+    label.colSpan = 2;
+    label.textContent = 'Total';
+    foot.appendChild(label);
+    for (const table of ['ours', 'recorded', 'ben']) {
+        const any = rows.some((r) => Number.isFinite(r[table]?.score));
+        for (const side of ['we', 'they']) {
+            const td = document.createElement('td');
+            td.className = 'sc-num';
+            td.textContent = any ? String(sum[table][side]) : '';
+            foot.appendChild(td);
+        }
+    }
+    scorecardUi.foot.replaceChildren(foot);
+}
+
+function scorecardLine(row) {
+    const tr = document.createElement('tr');
+    const board = document.createElement('td');
+    board.className = 'sc-board';
+    board.textContent = row.board || row.label;
+    board.title = `${row.label}${row.seat < 0 ? ' - BEN played all four' : ` - you played ${SEAT_NAMES[row.seat]}`}`;
+    tr.appendChild(board);
+
+    const result = document.createElement('td');
+    result.className = 'sc-result';
+    appendResult(result, row.ours);
+    tr.appendChild(result);
+
+    for (const table of ['ours', 'recorded', 'ben']) {
+        const split = weThey(row[table]?.score, row.seat);
+        const title = row[table] ? resultText(row[table]) : '';
+        for (const side of ['we', 'they']) {
+            const td = document.createElement('td');
+            if (!split) {
+                // Not played there (BEN not asked yet) or no result recorded.
+                td.className = 'sc-none';
+                td.textContent = '--';
+            } else {
+                td.className = 'sc-num';
+                td.textContent = split[side] === null ? '' : String(split[side]);
+            }
+            if (title) td.title = title;
+            tr.appendChild(td);
+        }
+    }
+    return tr;
+}
+
+/** "3♦N-1", with the pip coloured, or "Pass". */
+function appendResult(parent, result) {
+    const text = resultText(result, (strain) => `\u0000${strain}\u0000`);
+    for (const [i, part] of text.split('\u0000').entries()) {
+        if (i % 2 === 1) {
+            if (part === 'N') parent.appendChild(document.createTextNode('NT'));
+            else appendSuitText(parent, `!${part}`);
+        } else if (part) {
+            parent.appendChild(document.createTextNode(part));
+        }
+    }
 }
 
 /* ---------------------------------------------------------------- debug */

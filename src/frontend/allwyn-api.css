@@ -113,6 +113,47 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* ---------------------------------------------------------------- scorecard */
+
+.scorecard-head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.scorecard-head h2 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.scorecard-file { margin-right: auto; font-size: 0.8rem; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scorecard-scroll { max-height: 26rem; overflow: auto; }
+
+#scorecard-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+#scorecard-table th, #scorecard-table td {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    text-align: left;
+    white-space: nowrap;
+}
+#scorecard-table thead th {
+    position: sticky;
+    background: var(--felt);
+    color: #fff;
+    font-weight: 700;
+}
+#scorecard-table thead tr:first-child th { top: 0; }
+#scorecard-table thead tr:nth-child(2) th { top: 2.1rem; }
+#scorecard-table th.sc-group { text-align: center; }
+#scorecard-table .sc-num { text-align: right; min-width: 4.2rem; }
+#scorecard-table td.sc-board { text-align: center; }
+#scorecard-table td.sc-result { font-weight: 700; }
+#scorecard-table td.sc-none { color: var(--text-faint); text-align: center; }
+#scorecard-table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--bg-sunken) 60%, transparent); }
+#scorecard-table tfoot td { font-weight: 800; border-top: 2px solid var(--border-strong); }
+/* The groups after your own table, set off by a heavier rule. */
+#scorecard-table td:nth-child(5), #scorecard-table td:nth-child(7),
+#scorecard-table thead tr:nth-child(2) th:nth-child(3), #scorecard-table thead tr:nth-child(2) th:nth-child(5) {
+    border-left: 2px solid var(--border-strong);
+}
+
 /* -------------------------------------------------------------------- debug */
 
 #debug[hidden] { display: none; }

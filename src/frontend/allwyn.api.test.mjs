@@ -18,6 +18,7 @@ import {
 } from './allwyn.api.js';
 import { GameState } from './allwyn.state.js';
 import { Card, Trick } from './allwyn.model.js';
+import { tableResult, scorecardRow, weThey, resultText, totals, toCsv } from './allwyn.scorecard.js';
 
 const results = [];
 async function check(name, fn) {
@@ -616,6 +617,46 @@ await check('BEN\'s version of the board, and the comparison with yours', async 
     assert.equal(impsFor(10), 0);
     assert.equal(Object.is(impsFor(-10), -0), false);
     assert.equal(impsFor(4000), 24);
+});
+
+await check('scorecard: We/They by seat, result text, totals and CSV', () => {
+    // N-S +420: we are N-S from S, E-W from W; BEN at all four counts as N-S.
+    assert.deepEqual(weThey(420, 2), { we: 420, they: null });
+    assert.deepEqual(weThey(420, 3), { we: null, they: 420 });
+    assert.deepEqual(weThey(-50, -1), { we: null, they: 50 });
+    assert.deepEqual(weThey(0, 0), { we: null, they: null });          // passed out
+    assert.equal(weThey(null, 0), null);                              // nothing to split
+
+    const c = (level, strain, declarer, doubling = '') => ({ level, strain, doubling, declarer });
+    assert.equal(resultText(tableResult(c(3, 'D', 0), 8, -50)), '3DN-1');
+    assert.equal(resultText(tableResult(c(3, 'S', 1), 9, -140)), '3SE=');
+    assert.equal(resultText(tableResult(c(4, 'H', 2), 12, 480)), '4HS+2');
+    assert.equal(resultText(tableResult(c(3, 'N', 2), 8, -50)), '3NTS-1');
+    assert.equal(resultText(tableResult(c(4, 'S', 3, 'X'), 7, 500)), '4SXW-3');
+    assert.equal(resultText(tableResult(null, null, 0)), 'Pass');
+    assert.equal(resultText(tableResult(c(2, 'S', 2), null, null)), '2SS');          // contract only
+    assert.equal(resultText(null), '');
+
+    const rows = [
+        scorecardRow({ key: 'b1', board: '1', label: 'Board 1', seat: 2,
+            ours: tableResult(c(3, 'D', 0), 8, -50), recorded: tableResult(c(3, 'D', 0), 9, 110),
+            ben: tableResult(c(3, 'N', 2), 9, 400) }),
+        scorecardRow({ key: 'b2', board: '2', label: 'Board 2', seat: 2,
+            ours: tableResult(c(3, 'S', 1), 9, -140), recorded: null }),
+        scorecardRow({ key: 'b5', board: '5', label: 'Board 5', seat: 2,
+            ours: tableResult(null, null, 0), recorded: tableResult(c(1, 'N', 1), 7, -90) }),
+    ];
+    assert.deepEqual(totals(rows), {
+        ours: { we: 0, they: 190 },
+        recorded: { we: 110, they: 90 },
+        ben: { we: 400, they: 0 },
+    });
+
+    const csv = toCsv(rows).trim().split('\n');
+    assert.equal(csv[0], 'Board,Played as,Result,We,They,Recorded result,Recorded We,Recorded They,BEN result,BEN We,BEN They');
+    assert.equal(csv[1], '1,S,3DN-1,,50,3DN=,110,,3NTS=,400,');
+    assert.equal(csv[2], '2,S,3SE=,,140,,,,,,');
+    assert.equal(csv[3], '5,S,Pass,,,1NTE=,,90,,,');
 });
 
 /* ---------------------------------------------------------- files on disk */

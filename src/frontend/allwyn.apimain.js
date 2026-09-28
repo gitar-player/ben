@@ -9,12 +9,14 @@
  * DealRunner speaks their message format.
  */
 
-import { Card } from './allwyn.model.js';
+import { Card, parseContract } from './allwyn.model.js';
 import { GameState } from './allwyn.state.js';
 import { collectDom, render, appendCall, appendSuitText } from './allwyn.render.js';
 import { initTheme } from './allwyn.theme.js';
 import { parseDealFile } from './allwyn.dealfile.js';
-import { BenApi, DealRunner } from './allwyn.api.js';
+import {
+    BenApi, DealRunner, reviewDecisions, playBenVersion, compareResults,
+} from './allwyn.api.js';
 
 const SEAT_NAMES = ['North', 'East', 'South', 'West'];
 const SUIT_PIPS = { S: '♠', H: '♥', D: '♦', C: '♣' };
@@ -35,6 +37,10 @@ const ui = {
     step: $('#step-button'),
     restart: $('#restart-button'),
     progress: $('#progress'),
+    compare: $('#compare'),
+    compareStatus: $('#compare-status'),
+    compareResult: $('#compare-result'),
+    compareDecisions: $('#compare-decisions'),
     log: $('#play-log'),
     logList: $('#play-log-list'),
 };
@@ -78,6 +84,7 @@ let runner = null;
 let running = false;          // playing continuously, as opposed to stepping
 let driving = false;          // drive() is running, perhaps paused between steps
 let generation = 0;           // bumped on restart, so a stale request is ignored
+let compared = false;         // the comparison with BEN has been started for this deal
 
 initTheme($('#theme-toggle'));
 initPanelToggle($('#auction-toggle'), 'allwyn.auctionHidden', 'auctionHidden', 'Auction', 'the auction panel');
@@ -180,6 +187,11 @@ function loadBoard() {
     state.expectTrickConfirm = false;
     ui.logList.replaceChildren();
     ui.log.hidden = true;
+    compared = false;
+    ui.compare.hidden = true;
+    ui.compareStatus.textContent = '';
+    ui.compareResult.replaceChildren();
+    ui.compareDecisions.replaceChildren();
 
     runner.step();     // 'start' is synchronous: deals the cards, asks nothing
     promptIfYourTurn();
@@ -234,6 +246,7 @@ async function drive() {
             if (!runner?.turn?.human || runner.done) running = false;
             promptIfYourTurn();
             paintControls();
+            if (runner?.done && humanSeat() >= 0 && !compared) compareWithBen();
         }
     }
 }
@@ -342,6 +355,198 @@ function yourTurnText({ seat, need }) {
 
 function setStatus(status, detail) {
     state.setConnection(status, detail);
+}
+
+/* ------------------------------------------------------------ comparison */
+
+/**
+ * Once a deal you played is over: what BEN would have done at each of your
+ * decisions, then the whole board again with BEN at all four seats, scored
+ * against yours. Both are plain API calls on positions the page already has.
+ */
+async function compareWithBen() {
+    compared = true;
+    const mine = generation;
+    const cancelled = () => mine !== generation;
+    const played = runner;
+    const seat = humanSeat();
+    const api = played.api;
+
+    ui.compare.hidden = false;
+    const status = (text) => { if (!cancelled()) ui.compareStatus.textContent = text; };
+
+    status('Asking BEN about your decisions...');
+    const review = await reviewDecisions(played, api, {
+        isCancelled: cancelled,
+        onProgress: (done, total) => status(`Asking BEN about your decisions: ${done} of ${total}...`),
+    });
+    if (cancelled()) return;
+    renderDecisions(review, played);
+
+    status("Playing the board with BEN at all four seats...");
+    let ben;
+    try {
+        ben = await playBenVersion(played.board, api, {
+            isCancelled: cancelled,
+            onStep: (_, r) => status(r.phase === 'bidding'
+                ? "BEN's table: bidding..."
+                : `BEN's table: trick ${Math.min(r.tricks.length + 1, 13)} of 13...`),
+        });
+    } catch (error) {
+        status(`Could not play BEN's version: ${error.message}`);
+        return;
+    }
+    if (cancelled() || !ben) return;
+    renderTables(played, ben, seat);
+    status('');
+}
+
+/** Your table and BEN's side by side: contract, tricks, score, and the auctions. */
+function renderTables(yours, bens, seat) {
+    const cmp = compareResults(yours.result, bens.result, seat);
+    const table = document.createElement('table');
+    const head = table.createTHead().insertRow();
+    for (const text of ['', 'You', 'BEN']) {
+        const th = document.createElement('th');
+        th.textContent = text;
+        head.appendChild(th);
+    }
+    const body = table.createTBody();
+    const row = (label, fill) => {
+        const tr = body.insertRow();
+        const th = document.createElement('th');
+        th.textContent = label;
+        tr.appendChild(th);
+        for (const runner of [yours, bens]) {
+            const td = tr.insertCell();
+            fill(td, runner);
+        }
+    };
+    row('Contract', (td, r) => appendContract(td, r.result.contract));
+    row("Declarer's tricks", (td, r) => {
+        td.className = 'num';
+        td.textContent = r.contract ? String(r.result.tricks_taken) : '-';
+    });
+    row('Score', (td, r) => {
+        td.className = 'num';
+        td.textContent = signed((r.result.score ?? 0) * (seat % 2 === 0 ? 1 : -1));
+    });
+
+    const verdict = document.createElement('p');
+    verdict.className = 'compare-verdict';
+    if (cmp.diff === 0) {
+        verdict.textContent = 'Same score as BEN.';
+    } else {
+        verdict.classList.add(cmp.diff > 0 ? 'better' : 'worse');
+        verdict.textContent = `${cmp.diff > 0 ? 'Better' : 'Worse'} than BEN by ${Math.abs(cmp.diff)} points`
+            + ` (${signed(cmp.imps)} IMP${Math.abs(cmp.imps) === 1 ? '' : 's'}).`;
+    }
+
+    ui.compareResult.replaceChildren(
+        table, verdict,
+        auctionLine('You', yours.auction, bens.auction, yours.dealer),
+        auctionLine('BEN', bens.auction, yours.auction, yours.dealer),
+    );
+}
+
+function signed(n) {
+    return n > 0 ? `+${n}` : String(n);
+}
+
+/** "4♥X by South", or "Passed out". */
+function appendContract(parent, contract) {
+    const c = parseContract(contract);
+    if (!c) {
+        parent.textContent = 'Passed out';
+        return;
+    }
+    appendCall(parent, `${c.level}${c.strain}`);
+    parent.appendChild(document.createTextNode(`${c.doubling} by ${SEAT_NAMES['NESW'.indexOf(c.declarer)]}`));
+}
+
+/** One table's calls in order, marking where they part from the other's. */
+function auctionLine(label, calls, other, dealer) {
+    const p = document.createElement('p');
+    p.className = 'compare-auction';
+    const name = document.createElement('span');
+    name.className = 'label';
+    name.textContent = `${label}:`;
+    p.appendChild(name);
+    calls.forEach((call, i) => {
+        const span = document.createElement('span');
+        span.className = call === other[i] ? 'call' : 'call differs';
+        span.title = `${SEAT_NAMES[(dealer + i) % 4]}${call === other[i] ? '' : ' - differs'}`;
+        appendCall(span, call === 'PASS' ? 'Pass' : call);
+        p.append(span, ' ');         // somewhere for a long auction to wrap
+    });
+    return p;
+}
+
+/** How often you did what BEN would have, and each place you did not. */
+function renderDecisions(review, played) {
+    const choices = review.filter((d) => !d.forced && !d.error);
+    const agreed = choices.filter((d) => d.same).length;
+    const forced = review.filter((d) => d.forced).length;
+    const failed = review.filter((d) => d.error).length;
+
+    const summary = document.createElement('p');
+    summary.className = 'compare-summary';
+    summary.textContent = `You made the same choice as BEN ${agreed} of ${choices.length} times`
+        + (forced ? ` (${forced} forced card${forced === 1 ? '' : 's'} not counted)` : '')
+        + (failed ? `; ${failed} could not be checked` : '')
+        + '.';
+
+    const list = document.createElement('ol');
+    let callNumber = 0;
+    for (const d of review) {
+        if (d.kind === 'bid') callNumber += 1;
+        if (d.same || d.forced) continue;
+
+        const item = document.createElement('li');
+        const where = document.createElement('span');
+        where.className = 'where';
+        where.textContent = d.kind === 'bid'
+            ? `Your call ${callNumber}`
+            : d.index === 0
+                ? 'Opening lead'
+                : `Trick ${Math.floor(d.index / 4) + 1}${d.seat === played.dummy ? ', from dummy' : ''}`;
+        item.appendChild(where);
+
+        const yours = document.createElement('span');
+        yours.className = 'yours';
+        appendAction(yours, d);
+        item.append(document.createTextNode('You '), yours);
+
+        if (d.error) {
+            item.appendChild(document.createTextNode(` - BEN could not say (${d.error})`));
+        } else {
+            const bens = document.createElement('span');
+            bens.className = 'bens';
+            appendAction(bens, { ...d, action: d.ben });
+            item.append(document.createTextNode(', BEN '), bens);
+            const why = document.createElement('span');
+            why.className = 'why';
+            if (d.explanation) appendSuitText(why, d.explanation);
+            else if (d.who) why.textContent = d.who;
+            if (why.childNodes.length) item.appendChild(why);
+        }
+        list.appendChild(item);
+    }
+    ui.compareDecisions.replaceChildren(summary, ...(list.children.length ? [list] : []));
+}
+
+function appendAction(parent, { kind, action }) {
+    if (kind === 'bid') appendCall(parent, action === 'PASS' ? 'Pass' : action);
+    else appendCard(parent, action);
+}
+
+/** "♠10" as nodes, the pip coloured. */
+function appendCard(parent, card) {
+    const suit = card[0];
+    const pip = document.createElement('span');
+    pip.className = suit === 'H' || suit === 'D' ? 'suit red' : 'suit';
+    pip.textContent = SUIT_PIPS[suit];
+    parent.append(pip, document.createTextNode(card[1] === 'T' ? '10' : card[1]));
 }
 
 /* ------------------------------------------------------------ your turn */
@@ -512,11 +717,7 @@ function addLogEntry(entry) {
         appendCall(action, entry.action === 'PASS' ? 'Pass' : entry.action);
     } else {
         when.textContent = `T${entry.trick}`;
-        const suit = entry.action[0];
-        const pip = document.createElement('span');
-        pip.className = suit === 'H' || suit === 'D' ? 'suit red' : 'suit';
-        pip.textContent = SUIT_PIPS[suit];
-        action.append(pip, document.createTextNode(entry.action[1] === 'T' ? '10' : entry.action[1]));
+        appendCard(action, entry.action);
         if (runner && runner.trick.cards.length === 1) item.classList.add('trick-start');
     }
 

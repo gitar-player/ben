@@ -14,6 +14,7 @@ import { parsePbn, parseLin, parseDealFile, boardDealer, boardVulnerability } fr
 import {
     normaliseCall, auctionToCtx, auctionIsOver, isLegalCall, contractFromAuction,
     contractString, scoreContract, BenApi, DealRunner, ApiError,
+    impsFor, reviewDecisions, playBenVersion, compareResults,
 } from './allwyn.api.js';
 import { GameState } from './allwyn.state.js';
 
@@ -364,6 +365,120 @@ await check('submitting when it is not your turn is refused', async () => {
     await runner.step();                                   // deal; North (BEN) to call
     assert.throws(() => runner.submitCall('1S'), /not your turn/);
     assert.throws(() => runner.submitCard('SA'), /not your turn/);
+});
+
+/** Play the board with a person at `human` who takes the first legal card and follows `script` for calls. */
+async function playAsHuman(board, script, human) {
+    let runner;
+    runner = new DealRunner(board, fakeApi(board, script, () => runner, []), { humanSeats: [human] });
+    while (!runner.done) {
+        const outcome = await runner.step();
+        if (outcome.kind !== 'input') continue;
+        if (outcome.need === 'bid') runner.submitCall(script[runner.auction.length]);
+        else runner.submitCard(runner.legalCards(outcome.seat)[0]);
+    }
+    return runner;
+}
+
+await check('every decision is recorded, with who made it', async () => {
+    const board = parsePbn(PBN).boards[0];
+    const script = ['PASS', '1C', '1S', 'PASS', '2C', 'PASS', '3N', 'PASS', 'PASS', 'PASS'];
+    const runner = await playAsHuman(board, script, 2);
+    assert.equal(runner.decisions.length, 10 + 52);
+    assert.deepEqual(runner.decisions.slice(0, 3).map((d) => [d.kind, d.seat, d.action, d.index, d.human]),
+        [['bid', 0, 'PASS', 0, false], ['bid', 1, '1C', 1, false], ['bid', 2, '1S', 2, true]]);
+    // South declares: South's and North's cards are the person's.
+    const cards = runner.decisions.filter((d) => d.kind === 'card');
+    assert.ok(cards.every((d) => d.human === (d.seat === 0 || d.seat === 2)));
+    assert.deepEqual(cards.map((d) => d.action), runner.played);
+    assert.ok(cards.every((d, i) => d.index === i));
+});
+
+await check('reviewDecisions asks BEN about each of your decisions in its own position', async () => {
+    const board = parsePbn(PBN).boards[0];
+    const script = ['PASS', '1C', '1S', 'PASS', '2C', 'PASS', '3N', 'PASS', 'PASS', 'PASS'];
+    const played = await playAsHuman(board, script, 3);       // West: on lead against 3NT
+    const requests = [];
+    // BEN agrees with every call and card except South's... no: West's second call and trick 2.
+    const api = {
+        async bid({ seat, auction }) {
+            requests.push(['bid', seat, auction.length]);
+            return { bid: auction.length === 7 ? '3S' : script[auction.length], explanation: 'why' };
+        },
+        async lead({ seat, auction }) {
+            requests.push(['lead', seat, auction.length]);
+            return { card: played.played[0], who: 'Simulation' };
+        },
+        async play({ seat, hand, played: sofar }) {
+            requests.push(['play', seat, sofar.length]);
+            assert.equal(hand, board.hands['NESW'.indexOf(seat)]);
+            assert.deepEqual(sofar, played.played.slice(0, sofar.length), 'the play as it stood then');
+            const theirs = played.played[sofar.length];
+            if (sofar.length === 4) {                           // disagree once
+                const other = played.decisions[4 + 10].forced ? theirs
+                    : [...'SHDC'].flatMap((suit) => [...'AKQJT98765432'].map((r) => suit + r)).find((c) => c !== theirs);
+                return { card: other, who: 'PIMC' };
+            }
+            return { card: theirs, who: 'PIMC' };
+        },
+    };
+    const progress = [];
+    const review = await reviewDecisions(played, api, { onProgress: (i, n) => progress.push([i, n]) });
+
+    const mine = played.decisions.filter((d) => d.human);
+    assert.equal(review.length, mine.length);
+    assert.deepEqual(progress.at(-1), [mine.length, mine.length]);
+    // West's calls: indexes 3 and 7. BEN would have bid 3S at index 7.
+    const calls = review.filter((d) => d.kind === 'bid');
+    assert.deepEqual(calls.map((d) => [d.index, d.action, d.ben, d.same]), [[3, 'PASS', 'PASS', true], [7, 'PASS', '3S', false]]);
+    assert.equal(calls[1].explanation, 'why');
+    assert.deepEqual(requests.filter((r) => r[0] === 'bid'), [['bid', 'W', 3], ['bid', 'W', 7]]);
+    // The opening lead goes to /lead, forced cards are not asked about at all.
+    assert.deepEqual(requests.find((r) => r[0] !== 'bid'), ['lead', 'W', 10]);
+    const forced = review.filter((d) => d.forced);
+    assert.ok(forced.every((d) => d.same && d.who === 'Forced'));
+    assert.equal(requests.filter((r) => r[0] === 'play').length,
+        review.filter((d) => d.kind === 'card' && !d.forced && d.index > 0).length);
+    const trick2 = review.find((d) => d.index === 4 && d.kind === 'card');
+    if (trick2 && !trick2.forced) assert.equal(trick2.same, false);
+    assert.ok(review.filter((d) => d.kind === 'card' && d.index !== 4).every((d) => d.same));
+});
+
+await check('a failed request marks that decision and the review carries on', async () => {
+    const board = parsePbn(PBN).boards[0];
+    const script = ['PASS', '1C', '1S', 'PASS', '2C', 'PASS', '3N', 'PASS', 'PASS', 'PASS'];
+    const played = await playAsHuman(board, script, 3);
+    let n = 0;
+    const api = {
+        async bid() { if (n++ === 0) throw new ApiError('down'); return { bid: 'PASS' }; },
+        async lead() { return { card: played.played[0] }; },
+        async play({ played: sofar }) { return { card: played.played[sofar.length] }; },
+    };
+    const review = await reviewDecisions(played, api);
+    assert.equal(review[0].error, 'down');
+    assert.equal(review[0].ben, null);
+    assert.equal(review.length, played.decisions.filter((d) => d.human).length);
+});
+
+await check('BEN\'s version of the board, and the comparison with yours', async () => {
+    const board = parsePbn(PBN).boards[0];
+    const script = ['PASS', '1C', '1S', 'PASS', '2C', 'PASS', '3N', 'PASS', 'PASS', 'PASS'];
+    let ben;
+    const steps = [];
+    ben = await playBenVersion(board, fakeApi(board, script, () => ben, []), {
+        onStep: (outcome, runner) => { ben = runner; steps.push(outcome.kind); },
+    });
+    assert.ok(ben.done);
+    assert.equal(ben.decisions.filter((d) => d.human).length, 0);
+    assert.equal(steps.filter((k) => k === 'trick').length, 13);
+
+    // Scores are kept N-S; the comparison is from the person's side.
+    assert.deepEqual(compareResults({ score: 400 }, { score: -100 }, 2), { yourScore: 400, benScore: -100, diff: 500, imps: 11 });
+    assert.deepEqual(compareResults({ score: 400 }, { score: -100 }, 1), { yourScore: -400, benScore: 100, diff: -500, imps: -11 });
+    assert.deepEqual(compareResults({}, { score: 50 }, 0), { yourScore: 0, benScore: 50, diff: -50, imps: -2 });
+    assert.equal(impsFor(10), 0);
+    assert.equal(Object.is(impsFor(-10), -0), false);
+    assert.equal(impsFor(4000), 24);
 });
 
 /* ---------------------------------------------------------- files on disk */

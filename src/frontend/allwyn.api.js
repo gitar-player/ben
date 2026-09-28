@@ -131,6 +131,15 @@ export function scoreContract({ level, strain, doubling }, vulnerable, tricks) {
     return score;
 }
 
+/** IMPs for a points difference, signed. Same scale as IMP_SCALE in src/scoring.py. */
+export function impsFor(diff) {
+    const limits = [10, 40, 80, 120, 160, 210, 260, 310, 360, 420, 490, 590, 740, 890,
+                    1090, 1290, 1490, 1740, 1990, 2240, 2490, 2990, 3490, 3990];
+    const index = limits.findIndex((limit) => Math.abs(diff) <= limit);
+    const imps = index < 0 ? 24 : index;
+    return diff < 0 && imps > 0 ? -imps : imps;
+}
+
 /* --------------------------------------------------------------------- API */
 
 export class ApiError extends Error {
@@ -246,6 +255,9 @@ export class DealRunner {
         this.tricks = [];            // {leader, cards, winner}
         this.trick = null;           // {leader, cards}
         this.tricksWon = [0, 0];     // N-S, E-W
+        // Every call and card in order, whoever made it, with where in the
+        // auction or play it came - enough to ask BEN about it afterwards.
+        this.decisions = [];
         this.phase = 'start';
     }
 
@@ -323,6 +335,7 @@ export class DealRunner {
         if (!isLegalCall(this.auction, call)) {
             throw new ApiError(`BEN (${SEATS[seat]}) answered ${response.bid}, which is not a legal call here`);
         }
+        this.decisions.push({ kind: 'bid', seat, action: call, index: this.auction.length, human: false });
         this.auction.push(call);
         this.emit({ message: 'bid_made', auction: [...this.auction], explanation: response.explanation ?? '' });
         this.log({ phase: 'bid', seat, action: call, who: response.who, explanation: response.explanation, response });
@@ -353,6 +366,7 @@ export class DealRunner {
         const call = normaliseCall(rawCall);
         if (!isLegalCall(this.auction, call)) throw new ApiError(`${rawCall} is not a legal call here`);
 
+        this.decisions.push({ kind: 'bid', seat: turn.seat, action: call, index: this.auction.length, human: true });
         this.auction.push(call);
         this.emit({ message: 'bid_made', auction: [...this.auction], explanation });
         this.log({ phase: 'bid', seat: turn.seat, action: call, who: 'You', explanation });
@@ -365,7 +379,7 @@ export class DealRunner {
         const turn = this.turn;
         if (!turn?.human || turn.need !== 'card') throw new ApiError('It is not your turn to play');
         const card = normaliseCard(rawCard);
-        this.playCard(turn.seat, card, { who: 'You' });
+        this.playCard(turn.seat, card, { who: 'You' }, true);
         if (this.phase === 'lead') {
             this.emit({ message: 'show_dummy', player: this.dummy, dummy: this.board.hands[this.dummy] });
             this.phase = 'play';
@@ -418,22 +432,28 @@ export class DealRunner {
         if (this.localForcedPlays && legal.length === 1) {
             response = { card: legal[0], who: 'Forced' };
         } else {
-            // Declarer decides for dummy: send declarer's seat and hand, with
-            // dummy's hand as `dummy`. gameapi.py refuses a call "as dummy".
-            const declarer = this.contract.declarer;
-            const acting = seat === this.dummy ? declarer : seat;
-            response = await this.api.play({
-                hand: this.board.hands[acting],
-                dummy: this.board.hands[this.dummy],
-                seat: SEATS[acting],
-                dealer: this.board.dealer,
-                vul: this.board.vul,
-                auction: this.auction,
-                played: this.played,
-            });
+            response = await this.api.play(this.cardRequest(seat, this.played));
         }
         this.playCard(seat, response.card, response);
         return { kind: 'card', seat, card: normaliseCard(response.card) };
+    }
+
+    /**
+     * The /play request for `seat`'s card after `played`. Declarer decides for
+     * dummy: send declarer's seat and hand, with dummy's hand as `dummy` -
+     * gameapi.py refuses a call "as dummy".
+     */
+    cardRequest(seat, played) {
+        const acting = this.controller(seat);
+        return {
+            hand: this.board.hands[acting],
+            dummy: this.board.hands[this.dummy],
+            seat: SEATS[acting],
+            dealer: this.board.dealer,
+            vul: this.board.vul,
+            auction: this.auction,
+            played,
+        };
     }
 
     /** The cards `seat` may play to the current trick. */
@@ -444,11 +464,16 @@ export class DealRunner {
         return following.length > 0 ? following : hand;
     }
 
-    playCard(seat, rawCard, response) {
+    playCard(seat, rawCard, response, human = false) {
         const card = normaliseCard(rawCard);
-        if (!this.legalCards(seat).includes(card)) {
+        const legal = this.legalCards(seat);
+        if (!legal.includes(card)) {
             throw new ApiError(`BEN (${SEATS[seat]}) answered ${rawCard}, which ${SEATS[seat]} cannot play here`);
         }
+        this.decisions.push({
+            kind: 'card', seat, action: card, index: this.played.length,
+            forced: legal.length === 1, human,
+        });
         this.hands[seat] = this.hands[seat].filter((c) => c !== card);
         this.trick.cards.push(card);
         this.played.push(card);
@@ -494,4 +519,89 @@ export class DealRunner {
 /** "s7" -> "S7", "C10" -> "CT". */
 function normaliseCard(card) {
     return String(card ?? '').toUpperCase().replace('10', 'T');
+}
+
+/* ---------------------------------------------------------- comparison */
+
+/**
+ * For each of the player's decisions in a finished deal, what BEN would have
+ * done in exactly that position: the same hand, the auction or play so far.
+ * The API is stateless, so the position is simply sent again.
+ *
+ * Resolves to one entry per decision: the decision, plus `ben` (BEN's call or
+ * card, null if the request failed), `same`, and BEN's explanation or engine.
+ * A card that was the only legal one is not asked about.
+ */
+export async function reviewDecisions(runner, api, { onProgress = () => {}, isCancelled = () => false } = {}) {
+    const mine = runner.decisions.filter((d) => d.human);
+    const board = runner.board;
+    const reviewed = [];
+
+    for (const [i, decision] of mine.entries()) {
+        if (isCancelled()) return reviewed;
+        onProgress(i, mine.length);
+        const entry = { ...decision, ben: null, same: false };
+        try {
+            if (decision.kind === 'bid') {
+                const response = await api.bid({
+                    hand: board.hands[decision.seat],
+                    seat: SEATS[decision.seat],
+                    dealer: board.dealer,
+                    vul: board.vul,
+                    auction: runner.auction.slice(0, decision.index),
+                });
+                entry.ben = normaliseCall(response.bid);
+                entry.explanation = response.explanation ?? '';
+                entry.who = response.who;
+            } else if (decision.forced) {
+                entry.ben = decision.action;
+                entry.who = 'Forced';
+            } else if (decision.index === 0) {
+                const response = await api.lead({
+                    hand: board.hands[decision.seat],
+                    seat: SEATS[decision.seat],
+                    dealer: board.dealer,
+                    vul: board.vul,
+                    auction: runner.auction,
+                });
+                entry.ben = normaliseCard(response.card);
+                entry.who = response.who;
+            } else {
+                const response = await api.play(runner.cardRequest(decision.seat, runner.played.slice(0, decision.index)));
+                entry.ben = normaliseCard(response.card);
+                entry.who = response.who;
+            }
+            entry.same = entry.ben === decision.action;
+        } catch (error) {
+            entry.error = error.message;
+        }
+        reviewed.push(entry);
+    }
+    onProgress(mine.length, mine.length);
+    return reviewed;
+}
+
+/**
+ * The same board with BEN in all four seats, played to the end. `onStep`
+ * hears about each step, for a progress line.
+ */
+export async function playBenVersion(board, api, { onStep = () => {}, isCancelled = () => false } = {}) {
+    const runner = new DealRunner(board, api);
+    while (!runner.done) {
+        if (isCancelled()) return null;
+        onStep(await runner.step(), runner);
+    }
+    return runner;
+}
+
+/**
+ * Your table against BEN's, from `seat`'s side: each score, the difference
+ * and its IMPs. A passed-out deal scores 0.
+ */
+export function compareResults(yours, bens, seat) {
+    const side = seat % 2 === 0 ? 1 : -1;          // scores are kept from N-S's side
+    const yourScore = (yours.score ?? 0) * side;
+    const benScore = (bens.score ?? 0) * side;
+    const diff = yourScore - benScore;
+    return { yourScore, benScore, diff, imps: impsFor(diff) };
 }

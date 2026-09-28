@@ -179,6 +179,14 @@ With a seat of your own:
 - When it is your card, click it. If you declare you also play dummy's cards; if you are dummy,
   BEN declares and you watch.
 - After your call or card BEN carries on by itself; **Pause** stops it between actions.
+- When the deal ends, **You vs BEN** in the side panel compares your deal with BEN's, in two
+  ways. First, BEN is asked what it would have done at each of your calls and cards, in the
+  same position (same hand, same auction or play so far); every place it would have chosen
+  differently is listed with BEN's reason, and forced cards are not counted. Then the board is
+  played again with BEN at all four seats, and the two tables are set side by side: contract,
+  declarer's tricks, score from your side, the difference in points and IMPs (the scale in
+  `src/scoring.py`), and both auctions with the calls that differ underlined. This takes a
+  request per decision plus a whole deal, so allow a minute or two.
 
 The API address defaults to `http://<this host>:8085`; change it in the **BEN API** box
 (remembered in localStorage) or pass `?api=http://host:8085` in the page URL. The page can be

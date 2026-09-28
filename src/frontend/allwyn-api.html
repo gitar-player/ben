@@ -134,6 +134,13 @@
         </div>
 
         <aside id="sidebar">
+            <!-- Filled in after a deal you played: BEN in your seat, and BEN at all four. -->
+            <section id="compare" class="panel" aria-label="Your deal compared with BEN's" hidden>
+                <h2>You vs BEN</h2>
+                <p id="compare-status" class="compare-status" aria-live="polite"></p>
+                <div id="compare-result"></div>
+                <div id="compare-decisions"></div>
+            </section>
             <div id="explain" class="explain" aria-label="Bidding explanations"></div>
             <section id="play-log" class="panel" aria-label="What BEN did" hidden>
                 <h2>BEN's decisions</h2>

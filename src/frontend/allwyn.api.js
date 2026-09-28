@@ -157,12 +157,17 @@ export class ApiError extends Error {
 export class BenApi {
     /**
      * @param {string} base e.g. "http://localhost:8085"
-     * @param {{fetch?: Function, tournament?: string}} options
+     * @param {{fetch?: Function, tournament?: string, onTrace?: Function}} options
+     *   onTrace, when given, hears about every request twice: once as it goes
+     *   out ({event: 'request', id, path, url, params}) and once as it ends
+     *   ({event: 'response', id, status, ms, body} or {event: 'error', id,
+     *   status?, ms, error, body?}). The page's debug panel is built on it.
      */
-    constructor(base, { fetch: fetchImpl = globalThis.fetch?.bind(globalThis), tournament = '' } = {}) {
+    constructor(base, { fetch: fetchImpl = globalThis.fetch?.bind(globalThis), tournament = '', onTrace = null } = {}) {
         this.base = String(base).replace(/\/+$/, '');
         this.fetch = fetchImpl;
         this.tournament = tournament;
+        this.onTrace = onTrace;
     }
 
     async get(path, params) {
@@ -170,29 +175,43 @@ export class BenApi {
         if (this.tournament) query.set('tournament', this.tournament);
         const url = `${this.base}${path}?${query}`;
 
+        const id = nextRequestId++;
+        const started = now();
+        const trace = (entry) => {
+            if (!this.onTrace) return;
+            try { this.onTrace({ id, path, ...entry }); } catch (_) { /* never let the panel break a deal */ }
+        };
+        trace({ event: 'request', url, params: Object.fromEntries(query) });
+        const fail = (message, extra = {}) => {
+            trace({ event: 'error', ms: now() - started, error: message, ...extra });
+            return new ApiError(message, url);
+        };
+
         let response;
         try {
             response = await this.fetch(url);
         } catch (cause) {
             // A refused connection, a CORS failure and a Host-header rejection
             // (HTTP 444, which the browser sees as a network error) all land here.
-            throw new ApiError(`Could not reach BEN at ${this.base} (${cause.message}). `
-                + 'Is gameapi.py running, and started with --allowed-hosts for this host?', url);
+            throw fail(`Could not reach BEN at ${this.base} (${cause.message}). `
+                + 'Is gameapi.py running, and started with --allowed-hosts for this host?');
         }
 
         let data;
         try {
             data = await response.json();
         } catch (_) {
-            throw new ApiError(`${path} answered HTTP ${response.status} with something that is not JSON`, url);
+            throw fail(`${path} answered HTTP ${response.status} with something that is not JSON`,
+                { status: response.status });
         }
         if (!response.ok || data?.error) {
-            throw new ApiError(`${path}: ${data?.error ?? `HTTP ${response.status}`}`, url);
+            throw fail(`${path}: ${data?.error ?? `HTTP ${response.status}`}`, { status: response.status, body: data });
         }
         // gameapi.py reports a request it will not act on as 200 + {message}.
         if (data?.message && !data.bid && !data.card) {
-            throw new ApiError(`${path}: ${data.message}`, url);
+            throw fail(`${path}: ${data.message}`, { status: response.status, body: data });
         }
+        trace({ event: 'response', status: response.status, ms: now() - started, body: data });
         return data;
     }
 
@@ -216,6 +235,13 @@ export class BenApi {
             played: played.join(''),
         });
     }
+}
+
+// Shared by every BenApi, so ids stay unique when the page makes a new client.
+let nextRequestId = 1;
+
+function now() {
+    return globalThis.performance?.now?.() ?? Date.now();
 }
 
 /** parse_vuln() in gameapi.py takes "", "NS", "EW" or "Both". */

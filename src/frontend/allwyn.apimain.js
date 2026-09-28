@@ -9,7 +9,7 @@
  * DealRunner speaks their message format.
  */
 
-import { Card, parseContract } from './allwyn.model.js';
+import { Card, parseContract, contractOutcome, scoreLine } from './allwyn.model.js';
 import { GameState } from './allwyn.state.js';
 import { collectDom, render, appendCall, appendSuitText } from './allwyn.render.js';
 import { initTheme } from './allwyn.theme.js';
@@ -21,6 +21,10 @@ import {
 const SEAT_NAMES = ['North', 'East', 'South', 'West'];
 const SUIT_PIPS = { S: '♠', H: '♥', D: '♦', C: '♣' };
 const API_KEY = 'allwyn.apiBase';
+// ?debug=true (or 1, yes, on) shows the API request log under the table.
+const DEBUG = ['1', 'true', 'yes', 'on'].includes(
+    (new URLSearchParams(window.location.search).get('debug') || '').toLowerCase());
+const DEBUG_MAX_ENTRIES = 500;
 const SEAT_KEY = 'allwyn.apiSeat';
 const TRICK_PAUSE_MS = 1200;
 
@@ -39,6 +43,11 @@ const ui = {
     progress: $('#progress'),
     compare: $('#compare'),
     resultCompare: $('#result-compare'),
+    resultYouLabel: $('#result-you-label'),
+    resultBen: $('#result-ben'),
+    resultBenContract: $('#result-ben-contract'),
+    resultBenOutcome: $('#result-ben-outcome'),
+    resultBenScore: $('#result-ben-score'),
     resultShowCompare: $('#result-show-compare'),
     compareStatus: $('#compare-status'),
     compareResult: $('#compare-result'),
@@ -172,6 +181,7 @@ function loadBoard() {
     driving = false;
 
     const human = humanSeat();
+    debugContext = human < 0 ? 'Deal' : 'Your table';
     state.options.humanSeats = [0, 1, 2, 3].map((seat) => seat === human);
     state.options.noHuman = human < 0;
     state.expectBidInput = false;
@@ -193,6 +203,8 @@ function loadBoard() {
     ui.compare.hidden = true;
     ui.resultCompare.hidden = true;
     ui.resultCompare.className = 'result-compare';
+    ui.resultYouLabel.hidden = true;
+    ui.resultBen.hidden = true;
     ui.resultShowCompare.hidden = true;
     ui.compareStatus.textContent = '';
     ui.compareResult.replaceChildren();
@@ -204,7 +216,10 @@ function loadBoard() {
 }
 
 function makeApi() {
-    return new BenApi(ui.api.value.trim(), { tournament: ui.tournament.value });
+    return new BenApi(ui.api.value.trim(), {
+        tournament: ui.tournament.value,
+        onTrace: DEBUG ? traceRequest : null,
+    });
 }
 
 // The API URL and scoring are read when a deal starts; changing them mid-deal
@@ -385,6 +400,7 @@ async function compareWithBen() {
     ui.compare.hidden = false;
     ui.resultCompare.hidden = false;
     ui.resultShowCompare.hidden = false;
+    ui.resultYouLabel.hidden = false;
     scrollSidebarToTop();
     const status = (text) => {
         if (cancelled()) return;
@@ -393,6 +409,7 @@ async function compareWithBen() {
         ui.progress.textContent = text ? `Deal complete. Comparing with BEN: ${text}` : 'Deal complete.';
     };
 
+    debugContext = 'Review';
     status('asking about your decisions...');
     const review = await reviewDecisions(played, api, {
         isCancelled: cancelled,
@@ -401,6 +418,7 @@ async function compareWithBen() {
     if (cancelled()) return;
     renderDecisions(review, played);
 
+    debugContext = "BEN's table";
     status("BEN's own table, bidding...");
     let ben;
     try {
@@ -418,12 +436,27 @@ async function compareWithBen() {
     }
     if (cancelled() || !ben) return;
     const verdict = renderTables(played, ben, seat);
+    showBenResult(ben);
     status('');
     ui.resultCompare.textContent = verdict.text;
     ui.resultCompare.classList.toggle('better', verdict.diff > 0);
     ui.resultCompare.classList.toggle('worse', verdict.diff < 0);
     ui.progress.textContent = 'Deal complete. See You vs BEN.';
     scrollSidebarToTop();
+}
+
+/** BEN's contract, tricks and score on the result box, laid out as yours is above it. */
+function showBenResult(ben) {
+    ui.resultBenContract.replaceChildren();
+    appendContract(ui.resultBenContract, ben.result.contract);
+    const contract = parseContract(ben.result.contract);
+    ui.resultBenOutcome.textContent = contract
+        ? `${ben.result.tricks_taken} tricks - ${contractOutcome(contract.level, ben.result.tricks_taken)}`
+        : 'No contract';
+    const score = contract ? scoreLine(ben.result.score) : null;
+    ui.resultBenScore.textContent = score ?? '';
+    ui.resultBenScore.hidden = !score;
+    ui.resultBen.hidden = false;
 }
 
 /** The panel is at the top of the sidebar, which scrolls on its own. */
@@ -475,7 +508,7 @@ function renderTables(yours, bens, seat) {
     } else {
         verdict.classList.add(cmp.diff > 0 ? 'better' : 'worse');
         verdict.textContent = `${cmp.diff > 0 ? 'Better' : 'Worse'} than BEN by ${Math.abs(cmp.diff)} points`
-            + ` (${signed(cmp.imps)} IMP${Math.abs(cmp.imps) === 1 ? '' : 's'}).`;
+            + ` (${signed(cmp.imps)}\u00a0IMP${Math.abs(cmp.imps) === 1 ? '' : 's'}).`;     // kept on one line
     }
 
     ui.compareResult.replaceChildren(
@@ -586,6 +619,164 @@ function appendCard(parent, card) {
     parent.append(pip, document.createTextNode(card[1] === 'T' ? '10' : card[1]));
 }
 
+/* ---------------------------------------------------------------- debug */
+
+// What the requests going out now are for, shown on each debug row: the deal
+// itself, a hint, or one of the two halves of the comparison with BEN.
+let debugContext = 'Deal';
+const debugEntries = [];
+const debugRows = new Map();          // request id -> its <li>
+const debugUi = {
+    panel: $('#debug'),
+    list: $('#debug-list'),
+    count: $('#debug-count'),
+};
+
+if (DEBUG && debugUi.panel) {
+    debugUi.panel.hidden = false;
+    $('#debug-clear')?.addEventListener('click', () => {
+        debugEntries.length = 0;
+        debugRows.clear();
+        debugUi.list.replaceChildren();
+        paintDebugCount();
+    });
+    $('#debug-copy')?.addEventListener('click', async () => {
+        const text = JSON.stringify(debugEntries, null, 2);
+        try {
+            await navigator.clipboard.writeText(text);
+            showNotice(`Copied ${debugEntries.length} request${debugEntries.length === 1 ? '' : 's'} as JSON.`);
+        } catch (_) {
+            // No clipboard (http on another host, or permission refused): hand it over as a file.
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+            link.download = `ben-api-debug-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+    });
+}
+
+/** BenApi's onTrace: one entry per request, filled in when the answer comes back. */
+function traceRequest(event) {
+    if (event.event === 'request') {
+        const entry = {
+            id: event.id,
+            context: debugContext,
+            time: new Date().toISOString(),
+            path: event.path,
+            url: event.url,
+            params: event.params,
+            status: 'pending',
+        };
+        debugEntries.push(entry);
+        if (debugEntries.length > DEBUG_MAX_ENTRIES) {
+            const dropped = debugEntries.shift();
+            debugRows.get(dropped.id)?.remove();
+            debugRows.delete(dropped.id);
+        }
+        addDebugRow(entry);
+    } else {
+        const entry = debugEntries.find((e) => e.id === event.id);
+        if (!entry) return;
+        entry.ms = Math.round(event.ms);
+        entry.httpStatus = event.status ?? null;
+        entry.status = event.event === 'response' ? 'ok' : 'error';
+        if (event.body !== undefined) entry.response = event.body;
+        if (event.error) entry.error = event.error;
+        updateDebugRow(entry);
+    }
+    paintDebugCount();
+}
+
+function paintDebugCount() {
+    const failed = debugEntries.filter((e) => e.status === 'error').length;
+    const pending = debugEntries.filter((e) => e.status === 'pending').length;
+    debugUi.count.textContent = `${debugEntries.length} request${debugEntries.length === 1 ? '' : 's'}`
+        + (pending ? `, ${pending} pending` : '')
+        + (failed ? `, ${failed} failed` : '');
+}
+
+function addDebugRow(entry) {
+    const list = debugUi.list;
+    const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 24;
+
+    const item = document.createElement('li');
+    const details = document.createElement('details');
+    const summary = document.createElement('summary');
+    details.appendChild(summary);
+    // The request and response are only laid out when the row is opened: a
+    // /play answer with its samples runs to hundreds of lines.
+    details.addEventListener('toggle', () => {
+        if (details.open) fillDebugDetail(details, entry);
+    });
+    item.appendChild(details);
+    list.appendChild(item);
+    debugRows.set(entry.id, item);
+    updateDebugRow(entry);
+    if (atBottom) list.scrollTop = list.scrollHeight;
+}
+
+function updateDebugRow(entry) {
+    const item = debugRows.get(entry.id);
+    if (!item) return;
+    const summary = item.querySelector('summary');
+    const cell = (className, text, title) => {
+        const span = document.createElement('span');
+        span.className = className;
+        span.textContent = text;
+        if (title) span.title = title;
+        return span;
+    };
+    const answer = entry.response?.bid ?? entry.response?.card
+        ?? (entry.response?.explanation !== undefined ? entry.response.explanation : '')
+        ?? '';
+    const status = entry.status === 'pending' ? '...'
+        : entry.status === 'ok' ? String(entry.httpStatus)
+        : String(entry.httpStatus ?? 'ERR');
+    summary.replaceChildren(
+        cell('id', `#${entry.id}`),
+        cell('time', new Date(entry.time).toLocaleTimeString([], { hour12: false }), entry.time),
+        cell('context', entry.context),
+        cell('path', entry.path),
+        cell('seat', entry.params?.seat ?? ''),
+        cell(entry.status === 'error' ? 'answer error' : 'answer', entry.status === 'error' ? entry.error : String(answer),
+            entry.status === 'error' ? entry.error : `${entry.response?.who ?? ''}`),
+        cell(`http ${entry.status === 'ok' ? 'ok' : entry.status === 'pending' ? 'pending' : 'fail'}`, status),
+        cell('ms', entry.ms === undefined ? '' : `${(entry.ms / 1000).toFixed(2)}s`),
+    );
+    const details = item.querySelector('details');
+    if (details.open) fillDebugDetail(details, entry);
+}
+
+function fillDebugDetail(details, entry) {
+    details.querySelector('.detail')?.remove();
+    const box = document.createElement('div');
+    box.className = 'detail';
+    const heading = (text) => {
+        const h = document.createElement('h3');
+        h.textContent = text;
+        return h;
+    };
+    const pre = (value) => {
+        const p = document.createElement('pre');
+        p.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+        return p;
+    };
+    const url = document.createElement('div');
+    url.className = 'url';
+    url.textContent = `GET ${entry.url}`;
+    box.append(heading('Request'), url, pre(entry.params));
+    if (entry.error) {
+        const error = document.createElement('div');
+        error.className = 'error';
+        error.textContent = entry.error;
+        box.append(heading('Error'), error);
+    }
+    if (entry.response !== undefined) box.append(heading(`Response - HTTP ${entry.httpStatus}, ${entry.ms} ms`), pre(entry.response));
+    else if (entry.status === 'pending') box.append(heading('Response'), pre('waiting...'));
+    details.appendChild(box);
+}
+
 /* ------------------------------------------------------------ your turn */
 
 /**
@@ -680,6 +871,8 @@ async function showHint() {
     state.busy = true;
     state.notify();
     let response;
+    const previousContext = debugContext;
+    debugContext = 'Hint';
     try {
         response = await runner.api.bid({
             hand: runner.board.hands[turn.seat],
@@ -692,6 +885,7 @@ async function showHint() {
         showNotice(error.message);
         return;
     } finally {
+        debugContext = previousContext;
         state.busy = false;
         state.notify();
     }

@@ -367,6 +367,47 @@ await check('submitting when it is not your turn is refused', async () => {
     assert.throws(() => runner.submitCard('SA'), /not your turn/);
 });
 
+await check('onTrace sees every request go out and come back, errors included', async () => {
+    const events = [];
+    let reply = { ok: true, status: 200, json: async () => ({ bid: '1S', who: 'NN' }) };
+    const api = new BenApi('http://ben:8085', {
+        fetch: async () => { if (reply instanceof Error) throw reply; return reply; },
+        onTrace: (e) => events.push(e),
+    });
+    await api.bid({ hand: 'AK97543.K.T3.AK7', seat: 'S', dealer: 'N', vul: 'None', auction: ['PASS'] });
+    assert.deepEqual(events.map((e) => e.event), ['request', 'response']);
+    assert.equal(events[0].id, events[1].id);
+    assert.equal(events[0].path, '/bid');
+    assert.equal(events[0].params.ctx, 'P');
+    assert.equal(events[0].params.seat, 'S');
+    assert.ok(events[0].url.startsWith('http://ben:8085/bid?'));
+    assert.equal(events[1].status, 200);
+    assert.deepEqual(events[1].body, { bid: '1S', who: 'NN' });
+    assert.ok(events[1].ms >= 0);
+
+    events.length = 0;
+    reply = { ok: false, status: 400, json: async () => ({ error: 'An error occurred: bad hand' }) };
+    await assert.rejects(api.bid({ hand: 'x', seat: 'S', dealer: 'N', vul: 'None', auction: [] }));
+    assert.deepEqual(events.map((e) => e.event), ['request', 'error']);
+    assert.equal(events[1].status, 400);
+    assert.match(events[1].error, /bad hand/);
+    assert.deepEqual(events[1].body, { error: 'An error occurred: bad hand' });
+    assert.ok(events[1].id > 0);
+
+    events.length = 0;
+    reply = new TypeError('Failed to fetch');
+    await assert.rejects(api.bid({ hand: 'x', seat: 'S', dealer: 'N', vul: 'None', auction: [] }));
+    assert.equal(events[1].event, 'error');
+    assert.match(events[1].error, /Could not reach BEN/);
+
+    // A listener that throws must not break the request it is watching.
+    const fragile = new BenApi('http://ben:8085', {
+        fetch: async () => ({ ok: true, status: 200, json: async () => ({ card: 'SA' }) }),
+        onTrace: () => { throw new Error('panel broke'); },
+    });
+    assert.equal((await fragile.lead({ hand: 'h', seat: 'W', dealer: 'N', vul: 'None', auction: [] })).card, 'SA');
+});
+
 /** Play the board with a person at `human` who takes the first legal card and follows `script` for calls. */
 async function playAsHuman(board, script, human) {
     let runner;

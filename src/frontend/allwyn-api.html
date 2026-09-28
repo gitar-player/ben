@@ -117,9 +117,17 @@
 
                 <!-- Shown when the deal finishes. -->
                 <div id="result" class="result" role="status" hidden>
+                    <div id="result-you-label" class="result-label" hidden>Your table</div>
                     <div id="result-contract" class="result-contract"></div>
                     <div id="result-outcome" class="result-outcome"></div>
                     <div id="result-score" class="result-score" hidden></div>
+                    <!-- BEN's contract and result on the same board, once it has played it. -->
+                    <div id="result-ben" class="result-ben" hidden>
+                        <div class="result-label">BEN's table</div>
+                        <div id="result-ben-contract" class="result-ben-contract"></div>
+                        <div id="result-ben-outcome" class="result-ben-outcome"></div>
+                        <div id="result-ben-score" class="result-ben-score" hidden></div>
+                    </div>
                     <!-- Where the comparison with BEN is up to, when you played a seat. -->
                     <div id="result-compare" class="result-compare" aria-live="polite" hidden></div>
                     <div class="result-buttons">
@@ -136,6 +144,17 @@
             <div id="east" class="hand" aria-label="East hand"></div>
             <div id="south" class="hand" aria-label="South hand"></div>
         </div>
+
+        <!-- ?debug=true: every request to gameapi.py and what came back. -->
+        <section id="debug" class="panel" aria-label="API debug log" hidden>
+            <div class="debug-head">
+                <h2>Debug - API requests</h2>
+                <span class="debug-count" id="debug-count"></span>
+                <button type="button" class="btn" id="debug-copy">Copy JSON</button>
+                <button type="button" class="btn" id="debug-clear">Clear</button>
+            </div>
+            <ol id="debug-list"></ol>
+        </section>
         </div>
 
         <aside id="sidebar">

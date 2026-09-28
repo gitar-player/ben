@@ -113,10 +113,112 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* -------------------------------------------------------------------- debug */
+
+#debug[hidden] { display: none; }
+.debug-head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.debug-head h2 {
+    margin: 0 auto 0 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.debug-count { font-size: 0.8rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+#debug-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 22rem;
+    overflow-y: auto;
+    font-family: var(--font-num);
+    font-size: 0.78rem;
+}
+#debug-list li { border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); }
+#debug-list summary {
+    display: grid;
+    grid-template-columns: 3rem 5.2rem 6.5rem 4.6rem 1.4rem minmax(0, 1fr) 3rem 4rem;
+    gap: var(--space-2);
+    padding: 3px 2px;
+    cursor: pointer;
+    list-style: none;
+    white-space: nowrap;
+}
+#debug-list summary::-webkit-details-marker { display: none; }
+#debug-list summary > span { overflow: hidden; text-overflow: ellipsis; }
+#debug-list summary:hover { background: var(--bg-sunken); }
+#debug-list .id, #debug-list .time, #debug-list .context { color: var(--text-faint); }
+#debug-list .path { color: var(--accent); }
+#debug-list .answer { color: var(--text); font-weight: 700; }
+/* Not .status: allwyn.css has that for the page's status bar. */
+#debug-list .http.ok { color: var(--green); }
+#debug-list .http.pending { color: var(--amber); }
+#debug-list .http.fail { color: var(--red); }
+#debug-list .ms { color: var(--text-muted); text-align: right; }
+
+#debug-list .detail { padding: var(--space-2) var(--space-2) var(--space-3); display: grid; gap: var(--space-1); }
+#debug-list .detail h3 { margin: var(--space-1) 0 0; font-size: 0.72rem; color: var(--text-muted); font-weight: 600; }
+#debug-list .detail .url { word-break: break-all; color: var(--text-muted); user-select: all; }
+#debug-list pre {
+    margin: 0;
+    padding: var(--space-2);
+    max-height: 16rem;
+    overflow: auto;
+    background: var(--bg-sunken);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+#debug-list .error { color: var(--red); }
+
 /* --------------------------------------------------------------- comparison */
 
+/* On the result box on the felt: BEN's own result under yours, each labelled. */
+.result-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgb(255 255 255 / 55%);
+}
+.result-ben {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin-top: var(--space-1);
+    padding-top: var(--space-2);
+    border-top: 1px solid rgb(255 255 255 / 18%);
+    align-self: stretch;
+}
+.result-ben[hidden] { display: none; }
+.result-ben-contract { font-size: 1.15rem; font-weight: 800; color: #fff; }
+.result-ben-outcome { font-size: 0.9rem; font-weight: 600; color: rgb(255 255 255 / 75%); }
+/* Yours, a size down. */
+.result-ben-score {
+    margin-top: 2px;
+    padding: 1px 10px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 10%);
+    border: 1px solid rgb(255 255 255 / 20%);
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+}
+.result-ben-score[hidden] { display: none; }
+
+/* Two results in the box: tighten it so it still fits inside the felt. */
+#result:has(#result-ben:not([hidden])) { gap: 6px; padding: var(--space-3) var(--space-5); }
+#result:has(#result-ben:not([hidden])) .result-contract { font-size: 1.35rem; }
+#result:has(#result-ben:not([hidden])) .result-score { margin-top: 0; font-size: 1rem; }
+.result-label[hidden] { display: none; }
+
 /* On the result box on the felt: the comparison's progress, then its verdict. */
-.result-compare { font-size: 0.9rem; font-weight: 600; color: rgb(255 255 255 / 80%); max-width: 18rem; }
+.result-compare { font-size: 0.9rem; font-weight: 600; color: rgb(255 255 255 / 80%); max-width: 21rem; text-wrap: balance; }
 .result-compare.better { color: #6fdc8c; }
 .result-compare.worse  { color: #ff8f8f; }
 .result-buttons { display: flex; gap: var(--space-2); justify-content: center; }

@@ -208,6 +208,13 @@ What it reads and does:
   Forced..., or You). The result is scored in the page, matching `src/scoring.py`.
 - An illegal or failed answer stops the deal without changing it; **Resume** or **Step** retries.
 
+Add `?debug=true` to the page URL for a **Debug** panel under the table that records every
+request to `gameapi.py`, including the hints and both halves of the comparison with BEN. Each row
+shows time, what the request was for, endpoint, seat, BEN's answer (or the error), HTTP status and
+duration. Click a row for the full URL, the parameters and the JSON response. **Copy JSON** puts
+the whole log on the clipboard, or downloads it as a file where the clipboard is not available,
+and **Clear** empties it. The last 500 requests are kept.
+
 The first request after `gameapi.py` starts is slow (models load lazily), and a whole deal
 takes about a minute on a laptop. The logic runs without a browser:
 

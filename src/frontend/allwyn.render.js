@@ -20,6 +20,21 @@ export function suitClass(index) {
     return `suit-${'shdc'[index]}`;
 }
 const SEAT_LABELS = ['.label-north', '.label-east', '.label-south', '.label-west'];
+const SEAT_NAMES = ['North', 'East', 'South', 'West'];
+
+/*
+ * The table can be turned so a chosen seat sits at the bottom: state.rotation
+ * is how many places to turn it (0, the default, draws North at the top). The
+ * DOM is laid out by position - top, right, bottom, left, the same order as
+ * the seats with no rotation - so these two convert between the two.
+ */
+function place(state, seat) {
+    return (seat - (state.rotation ?? 0) + 4) % 4;
+}
+
+function seatAt(state, position) {
+    return (position + (state.rotation ?? 0)) % 4;
+}
 
 /** Cache the elements we touch; ids come from allwyn.html. */
 export function collectDom(root = document) {
@@ -75,7 +90,7 @@ function handIsVisible(state, seat) {
 function renderHands(state, dom) {
     const { deal } = state;
     deal.hands.forEach((hand, seat) => {
-        const element = dom.hands[seat];
+        const element = dom.hands[place(state, seat)];
         if (!element) return;
 
         if (!handIsVisible(state, seat)) {
@@ -116,7 +131,7 @@ function renderTrick(state, dom) {
     });
     if (!trick) return;
     for (let seat = trick.leadPlayer, i = 0; i < trick.cards.length; seat = (seat + 1) % 4, i++) {
-        dom.trickSlots[seat]?.appendChild(cardElement(trick.cards[i]));
+        dom.trickSlots[place(state, seat)]?.appendChild(cardElement(trick.cards[i]));
     }
 }
 
@@ -148,13 +163,17 @@ function renderAuction(state, dom) {
     wrapper.id = 'auction';
     const table = document.createElement('table');
 
+    // Columns run left, top, right, bottom as the table is drawn - West, North,
+    // East, South when it is not turned - so each column sits on the side of
+    // the player whose calls it holds.
+    const columns = [3, 0, 1, 2].map((position) => seatAt(state, position));
     const head = document.createElement('thead');
     const headRow = document.createElement('tr');
-    ['West', 'North', 'East', 'South'].forEach((seat, i) => {
+    columns.forEach((seat) => {
         const th = document.createElement('th');
-        th.textContent = seat;
+        th.textContent = SEAT_NAMES[seat];
         // North/South share vulnerability, as do East/West.
-        if (auction.vuln[i % 2 === 0 ? 1 : 0]) th.className = 'red';
+        if (auction.vuln[seat % 2 === 0 ? 0 : 1]) th.className = 'red';
         headRow.appendChild(th);
     });
     head.appendChild(headRow);
@@ -162,7 +181,8 @@ function renderAuction(state, dom) {
 
     const body = document.createElement('tbody');
     let row;
-    auction.paddedBids.forEach((call, i) => {
+    const padded = [...Array(columns.indexOf(state.deal.dealer)).fill(''), ...auction.bids];
+    padded.forEach((call, i) => {
         if (i % 4 === 0) {
             row = document.createElement('tr');
             body.appendChild(row);
@@ -262,8 +282,10 @@ function renderBiddingBox(state, dom) {
 
 function renderSeatLabels(state, dom) {
     const { deal } = state;
-    dom.seatLabels.forEach((label, seat) => {
+    dom.seatLabels.forEach((label, position) => {
         if (!label) return;
+        const seat = seatAt(state, position);
+        label.textContent = 'NESW'[seat];
         label.classList.toggle('turn', deal.turn === seat);
         label.classList.toggle('dealer', deal.dealer === seat);
         label.classList.toggle('red', deal.vuln[seat % 2 === 0 ? 0 : 1]);

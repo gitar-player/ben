@@ -223,6 +223,8 @@ function loadBoard() {
     state.selectedLevel = null;
     if (dom.bidding) dom.bidding.hidden = human < 0;
     state.playerNames = playerTags(board, human);
+    // Turn the table so the seat you play is at the bottom, as on BBO.
+    state.rotation = human < 0 ? 0 : (human + 2) % 4;
 
     runner = new DealRunner(board, makeApi(), {
         emit: (message) => state.apply(message),

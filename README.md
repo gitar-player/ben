@@ -175,6 +175,9 @@ describes (endpoints in [README-api.md](README-api.md)).
 
 With a seat of your own:
 
+- The table turns so your seat is at the bottom, as on BBO: seats keep their letters (play East
+  and the bottom circle reads E, with North on your right), and the auction's columns turn with
+  it. With BEN at all four seats North stays at the top.
 - Only your hand is shown, and dummy's once the opening lead is made; all four are shown when
   the deal ends.
 - When it is your call the bidding box appears (level, then strain; **Hint** shows what BEN

@@ -19,6 +19,7 @@ import {
 import { parseDealFile } from './allwyn.dealfile.js';
 import {
     BenApi, DealRunner, reviewDecisions, playBenVersion, compareResults, contractString,
+    normaliseCall, isLegalCall,
 } from './allwyn.api.js';
 
 const SEAT_NAMES = ['North', 'East', 'South', 'West'];
@@ -71,6 +72,8 @@ const state = new GameState({
     autoplay: false,
     timeoutSeconds: 0,
 });
+// Choice, beside Hint: the calls open to you and what each would mean.
+state.biddingExtras = ['Choice'];
 state.connection = { status: 'idle', detail: 'Choose a .pbn or .lin file, pick a board, then Play hand.' };
 state.subscribe(() => render(state, dom));
 
@@ -92,6 +95,25 @@ state.updateRevealed = () => {
     if (state.deal?.dummy !== undefined) shown.add(state.deal.dummy);
     state.revealed = shown;
 };
+
+/**
+ * Name tags for the felt, from the players the file names: BBO's robots
+ * (~~M...) shown as "Robot", the full name on hover. The seat you play is
+ * marked, and called "You" when the file has no name for it.
+ */
+function playerTags(board, human) {
+    return [0, 1, 2, 3].map((seat) => {
+        const name = board.players?.[seat] ?? null;
+        const you = seat === human;
+        if (!name) return you ? { text: 'You', you } : null;
+        const shown = /^~~/.test(name) ? 'Robot' : name;
+        return {
+            text: you ? `${shown} (you)` : shown,
+            title: `${SEAT_NAMES[seat]}: ${name}${you ? ' - you' : ''}`,
+            you,
+        };
+    });
+}
 
 /** The seat index you play, or -1 for none. */
 function humanSeat() {
@@ -200,6 +222,7 @@ function loadBoard() {
     state.expectCardInput = false;
     state.selectedLevel = null;
     if (dom.bidding) dom.bidding.hidden = human < 0;
+    state.playerNames = playerTags(board, human);
 
     runner = new DealRunner(board, makeApi(), {
         emit: (message) => state.apply(message),
@@ -1132,6 +1155,7 @@ dom.bidding?.addEventListener('click', (event) => {
     }
     const text = target.textContent?.trim();
     if (text === 'Hint') showHint();
+    else if (text === 'Choice') showChoices();
     else if (['PASS', 'X', 'XX'].includes(text)) makeCall(text);
 });
 
@@ -1196,6 +1220,114 @@ document.body.addEventListener('keydown', (event) => {
         onCardActivate(event);
     }
 });
+
+/**
+ * The calls open to you here, each with what it would show in BEN's bidding
+ * system, from gameapi.py's /bids. Clicking one makes it.
+ */
+async function showChoices() {
+    const turn = runner?.turn;
+    if (!turn?.human || turn.need !== 'bid') return;
+    const auction = [...runner.auction];
+    state.busy = true;
+    state.notify();
+    let list;
+    const previousContext = debugContext;
+    debugContext = 'Choice';
+    try {
+        list = await runner.api.choices({ auction });
+    } catch (error) {
+        showNotice(error.message);
+        return;
+    } finally {
+        debugContext = previousContext;
+        state.busy = false;
+        state.notify();
+    }
+    // The position may have moved on while the answer was coming.
+    if (runner.turn?.need !== 'bid' || runner.auction.length !== auction.length) return;
+
+    const dialog = $('#choice-dialog');
+    const body = $('#choice-body');
+    if (!dialog || !body || !Array.isArray(list)) return;
+
+    const choices = list.map((c) => ({ ...c, call: normaliseCall(c.bid) }))
+        .filter((c) => isLegalCall(auction, c.call));
+    const meaningful = choices.filter((c) => meaningOf(c).name || meaningOf(c).detail);
+    const bare = choices.filter((c) => !meaningOf(c).name && !meaningOf(c).detail);
+
+    const intro = document.createElement('p');
+    intro.className = 'choice-intro';
+    intro.appendChild(document.createTextNode(auction.length
+        ? `Your calls as ${SEAT_NAMES[turn.seat]} after `
+        : `Your calls as ${SEAT_NAMES[turn.seat]}, opening the bidding`));
+    auction.forEach((call, i) => {
+        if (i) intro.appendChild(document.createTextNode(' '));
+        appendCall(intro, call === 'PASS' ? 'Pass' : call);
+    });
+    intro.appendChild(document.createTextNode(', and what each would show in BEN\'s system. Click one to make it.'));
+
+    const children = [intro, choiceList(meaningful, dialog)];
+    if (bare.length) {
+        const more = document.createElement('details');
+        more.className = 'choice-more';
+        const summary = document.createElement('summary');
+        summary.textContent = `${bare.length} more call${bare.length === 1 ? '' : 's'} with no agreed meaning`;
+        more.append(summary, choiceList(bare, dialog));
+        children.push(more);
+    }
+    body.replaceChildren(...children);
+    dialog.showModal();
+}
+
+/** "Stayman -- ; 7+ HCP; Artificial" -> name "Stayman", detail "7+ HCP; Artificial". */
+function meaningOf(choice) {
+    const [name = '', detail = ''] = String(choice.m ?? '').split(' -- ');
+    return {
+        name: name.trim(),
+        detail: detail.replace(/^[\s;]+/, '').trim(),
+    };
+}
+
+function choiceList(choices, dialog) {
+    const list = document.createElement('ul');
+    list.className = 'choice-list';
+    for (const choice of choices) {
+        const item = document.createElement('li');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'choice-call';
+        appendCall(button, choice.call === 'PASS' ? 'Pass' : choice.call);
+        button.addEventListener('click', () => {
+            dialog.close();
+            makeCall(choice.call);
+        });
+
+        const text = document.createElement('div');
+        const { name, detail } = meaningOf(choice);
+        if (name) {
+            const strong = document.createElement('span');
+            strong.className = 'choice-name';
+            appendSuitText(strong, name);
+            text.appendChild(strong);
+        }
+        if (choice.Alert) {
+            const alert = document.createElement('span');
+            alert.className = 'choice-alert';
+            alert.textContent = 'Alert';
+            text.appendChild(alert);
+        }
+        if (detail) {
+            const span = document.createElement('span');
+            span.className = 'choice-detail';
+            appendSuitText(span, detail);
+            text.appendChild(span);
+        }
+        item.append(button, text);
+        list.appendChild(item);
+    }
+    return list;
+}
 
 /** BEN's choice for your seat, with what it considered. */
 async function showHint() {

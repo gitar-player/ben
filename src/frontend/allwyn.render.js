@@ -251,6 +251,9 @@ function renderBiddingBox(state, dom) {
     addCall('redouble', 'XX', state.deal.canRedouble);
     addCall('alert', 'Alert');
     addCall('hint', 'Hint');
+    // Extra buttons a page asks for - allwyn-api.html's Choice. Opt-in, so a
+    // page with nothing to answer them does not show them.
+    for (const extra of state.biddingExtras ?? []) addCall(extra.toLowerCase(), extra);
     box.appendChild(calls);
     box.appendChild(suits);
 
@@ -264,7 +267,30 @@ function renderSeatLabels(state, dom) {
         label.classList.toggle('turn', deal.turn === seat);
         label.classList.toggle('dealer', deal.dealer === seat);
         label.classList.toggle('red', deal.vuln[seat % 2 === 0 ? 0 : 1]);
+        renderPlayerName(label, state.playerNames?.[seat]);
     });
+}
+
+/**
+ * The player's name beside a seat on the felt, when the page has one:
+ * {text, title, you}. A page that sets no state.playerNames shows none.
+ */
+function renderPlayerName(label, player) {
+    const holder = label.parentElement;
+    if (!holder) return;
+    let tag = holder.querySelector('.seat-name');
+    if (!player?.text) {
+        tag?.remove();
+        return;
+    }
+    if (!tag) {
+        tag = document.createElement('span');
+        tag.className = 'seat-name';
+        holder.appendChild(tag);
+    }
+    tag.textContent = player.text;
+    tag.title = player.title ?? player.text;
+    tag.classList.toggle('you', Boolean(player.you));
 }
 
 /**

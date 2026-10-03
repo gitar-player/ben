@@ -4,7 +4,8 @@
  * Both parsers return the same shape, one entry per board found:
  *
  *   { label, board, dealer: 'N'|'E'|'S'|'W', vul: 'None'|'NS'|'EW'|'Both',
- *     hands: [north, east, south, west] }      // PBN holdings, "AK4.QJ.T98.65432"
+ *     hands: [north, east, south, west],       // PBN holdings, "AK4.QJ.T98.65432"
+ *     players: [north, east, south, west] }    // names as the file gives them, or null
  *
  * plus, when the file records how the board went at the table:
  *
@@ -177,8 +178,15 @@ function pbnGame(tags) {
         dealer,
         vul,
         hands: finishHands(hands),
+        players: ['North', 'East', 'South', 'West'].map((seat) => playerName(tags[seat])),
         recorded: pbnRecorded(tags, dealer, vul),
     };
+}
+
+/** A name as given, or null for the blanks files use: "", "?", "-". */
+function playerName(value) {
+    const name = String(value ?? '').trim();
+    return name && name !== '?' && name !== '-' ? name : null;
 }
 
 /**
@@ -298,18 +306,25 @@ export function parseLin(text) {
     const boards = [];
     const errors = [];
     const starts = [...lin.matchAll(/md\|/gi)].map((m) => m.index);
+    // Player names (pn|) usually come once, ahead of the first deal.
+    const header = starts.length ? lin.slice(0, starts[0]) : '';
 
     starts.forEach((start, i) => {
         // A deal's own tags (board number, vulnerability) mostly follow its
         // md|, up to the next one. Some writers put qx|, ah| or sv| just ahead
         // of md| instead: that is the file header for the first deal, and
         // from the last qx| on for the others.
-        const segment = lin.slice(start, starts[i + 1] ?? lin.length);
+        // A deal runs to the next md|, or to the next qx| when there is one
+        // first: a tournament file puts qx| and pn| ahead of each deal, and
+        // they belong to the deal that follows, not this one.
+        const nextDeal = starts[i + 1] ?? lin.length;
+        const nextQx = lin.slice(start, nextDeal).search(/(?<=^|\|)qx\|/i);
+        const segment = lin.slice(start, nextQx > 0 ? start + nextQx : nextDeal);
         const before = lin.slice(i === 0 ? 0 : starts[i - 1], start);
         const qx = before.lastIndexOf('qx|');
         const lookBack = qx >= 0 ? before.slice(qx) : (i === 0 ? before : '');
         try {
-            boards.push(linDeal(segment, lookBack));
+            boards.push(linDeal(segment, lookBack, header));
         } catch (error) {
             errors.push(`Deal ${i + 1}: ${error.message}`);
         }
@@ -326,7 +341,7 @@ function linTag(tag, ...texts) {
     return undefined;
 }
 
-function linDeal(segment, lookBack) {
+function linDeal(segment, lookBack, header = '') {
     const md = /^md\|([^|]*)\|/i.exec(segment);
     if (!md) throw new Error('empty md|');
     const value = md[1];
@@ -362,8 +377,22 @@ function linDeal(segment, lookBack) {
         dealer,
         vul,
         hands,
+        players: linPlayers(linTag('pn', segment, lookBack, header), room),
         recorded: linRecorded(segment, dealer, vul),
     };
+}
+
+/**
+ * pn| lists South, West, North, East. A vugraph file lists eight - the open
+ * room's four, then the closed room's - so a closed-room deal takes the second
+ * four. Returned in N, E, S, W order.
+ */
+function linPlayers(pn, room) {
+    if (!pn) return [null, null, null, null];
+    let names = pn.split(',');
+    if (names.length >= 8 && room?.toLowerCase() === 'c') names = names.slice(4, 8);
+    const [south, west, north, east] = names;
+    return [north, east, south, west].map(playerName);
 }
 
 /**

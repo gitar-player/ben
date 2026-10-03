@@ -104,6 +104,29 @@ await check('LIN: vugraph file with several deals, and a handviewer URL', () => 
     assert.deepEqual(parseLin(url).boards[0].hands, HANDS);
 });
 
+await check('player names: PBN tags, LIN pn| (S W N E), the closed room of a vugraph', () => {
+    const pbn = `[Board "1"]\n[North "Ann"]\n[East "?"]\n[South "Cat"]\n[West ""]\n[Deal "N:${HANDS.join(' ')}"]\n`;
+    assert.deepEqual(parsePbn(pbn).boards[0].players, ['Ann', null, 'Cat', null]);
+    assert.deepEqual(parsePbn(PBN).boards[0].players, [null, null, null, null]);
+
+    assert.deepEqual(parseLin(LIN).boards[0].players, ['Cat', 'Dan', 'Ann', 'Bob']);   // pn|Ann,Bob,Cat,Dan| = S,W,N,E
+
+    const md = 'md|3SAJ9HAQT6DJT62C98,SQ8762HKJ54DA93C7,ST5H982D874CAQ632,|';
+    const vugraph = `pn|s1,w1,n1,e1,s2,w2,n2,e2|qx|o1|${md}pg||qx|c1|${md}pg||`;
+    const [open, closed] = parseLin(vugraph).boards;
+    assert.deepEqual(open.players, ['n1', 'e1', 's1', 'w1']);
+    assert.deepEqual(closed.players, ['n2', 'e2', 's2', 'w2']);
+    assert.deepEqual(parseLin(md).boards[0].players, [null, null, null, null]);
+
+    // A team-match file names each table just ahead of its deal: qx|, pn|, md|.
+    // Each deal must take its own pn|, not the next deal's.
+    const teams = `vg|Match|pn|s1,w1,n1,e1,s2,w2,n2,e2|qx|o1|pn|s1,w1,n1,e1|${md}sv|o|mb|p|pg||`
+        + `qx|c1|pn|s2,w2,n2,e2|${md}sv|o|mb|p|pg||`;
+    const [teamOpen, teamClosed] = parseLin(teams).boards;
+    assert.deepEqual(teamOpen.players, ['n1', 'e1', 's1', 'w1']);
+    assert.deepEqual(teamClosed.players, ['n2', 'e2', 's2', 'w2']);
+});
+
 await check('parseDealFile picks by extension, then by content', () => {
     assert.equal(parseDealFile('x.lin', LIN).boards.length, 1);
     assert.equal(parseDealFile('x.pbn', PBN).boards.length, 2);
@@ -369,6 +392,13 @@ await check('BenApi builds the documented query and surfaces errors', async () =
     assert.equal(q.get('vul'), '');
     assert.equal(q.get('tournament'), 'mp');
     assert.equal(q.get('details'), 'true');
+
+    reply = ok([{ bid: 'P', m: ' -- ; 9- HCP' }, { bid: 'XX', m: 'Penalty -- ; 10+ HCP' }]);
+    const list = await api.choices({ auction: ['PASS', '1C', 'X'] });
+    assert.equal(seen.at(-1).pathname, '/bids');
+    assert.equal(seen.at(-1).searchParams.get('ctx'), 'P-1C-X');
+    assert.equal(list.length, 2);
+    seen.length = 1;
 
     reply = ok({ card: 'S7' });
     await api.play({ hand: 'h', dummy: 'd', seat: 'S', dealer: 'N', vul: 'Both', auction: ['4S', 'PASS', 'PASS', 'PASS'], played: ['DJ', 'DK'] });

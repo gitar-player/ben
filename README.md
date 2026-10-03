@@ -1,3 +1,6 @@
+[Start Playing](http://localhost:8080/app/allwyn-api.html)
+
+
 # Bridge Engine
 
 This is a game engine for [bridge](https://en.wikipedia.org/wiki/Contract_bridge).
@@ -175,7 +178,9 @@ With a seat of your own:
 - Only your hand is shown, and dummy's once the opening lead is made; all four are shown when
   the deal ends.
 - When it is your call the bidding box appears (level, then strain; **Hint** shows what BEN
-  would call and what it considered). Your call is explained through `/explain` like BEN's.
+  would call and what it considered; **Choice** lists every call open to you with what it would
+  show in BEN's bidding system - name, shape and points, alerts flagged - from `/bids`, and
+  clicking one makes it). Your call is explained through `/explain` like BEN's.
 - When it is your card, click it. If you declare you also play dummy's cards. If your partner
   declares, you play the hand for them - declarer's cards and your own as dummy - as on BBO with
   a robot partner, and partner's hand is shown from the end of the auction.
@@ -212,6 +217,10 @@ What it reads and does:
   open/closed room), and BBO handviewer URLs with the lin in the query string. A blank East hand
   is worked out from the other three.
 - Any auction or play already in the file is ignored - BEN bids and plays the deal afresh.
+- Player names in the file - PBN `[North]`, `[East]`, `[South]`, `[West]`, or LIN `pn|`
+  (South, West, North, East; a vugraph's closed room takes the second four) - are shown beside
+  the seats on the felt. BBO robots (`~~M...`) show as "Robot", with the full name on hover; the
+  seat you play is marked "(you)", or "You" when the file has no name for it.
 - Dummy's cards are asked of declarer (`seat` = declarer, `dummy` = dummy's hand), since
   `/play` refuses a call made as dummy. A card that is the only legal play is played without a
   request.

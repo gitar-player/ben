@@ -476,6 +476,31 @@ a:hover { text-decoration: underline; }
 
 .table-grid-item { display: flex; justify-content: center; align-items: center; }
 
+/* Player names beside the seats, when the page knows them. Positioned off the
+   seat circle rather than in the grid, so a long name never moves the table:
+   to the right of North and South, under East and West. */
+.label-north, .label-south, .label-east, .label-west { position: relative; }
+.seat-name {
+    position: absolute;
+    z-index: 2;
+    max-width: 9.5rem;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: rgb(6 20 12 / 55%);
+    border: 1px solid rgb(255 255 255 / 14%);
+    color: rgb(255 255 255 / 88%);
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: auto;
+}
+.seat-name.you { color: #fff; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 35%, rgb(6 20 12 / 70%)); }
+.label-north .seat-name, .label-south .seat-name { left: calc(100% + 8px); top: 50%; translate: 0 -50%; }
+.label-west .seat-name { top: calc(100% + 6px); left: 0; }
+.label-east .seat-name { top: calc(100% + 6px); right: 0; }
+
 .seat-label {
     display: grid;
     place-items: center;
@@ -873,6 +898,7 @@ a:hover { text-decoration: underline; }
 #bidding-calls .pass { color: var(--green); }
 #bidding-calls .double, #bidding-calls .redouble { color: var(--red); }
 #bidding-calls .hint { color: var(--accent); }
+#bidding-calls .choice { color: var(--accent); }
 #bidding-calls .alert { color: var(--amber); }
 
 .hidden { display: none !important; }

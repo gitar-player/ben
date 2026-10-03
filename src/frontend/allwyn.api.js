@@ -223,6 +223,17 @@ export class BenApi {
         return this.get('/lead', { hand, seat, dealer, vul: apiVul(vul), ctx: auctionToCtx(auction) });
     }
 
+    /**
+     * Every call open to the next bidder after `auction`, with what each
+     * would show in the bidding system: [{bid, m, Alert, MinHcp, MaxHcp, ...}].
+     * gameapi.py's /bids counts the auction from North and ignores
+     * vulnerability; the calls passed start at the real dealer, which is all
+     * the system needs to tell partner from opponents.
+     */
+    choices({ auction }) {
+        return this.get('/bids', { ctx: auctionToCtx(auction) });
+    }
+
     /** What the bidding system says the last call of `auction` shows. */
     explain({ seat, dealer, vul, auction }) {
         return this.get('/explain', { seat, dealer, vul: apiVul(vul), ctx: auctionToCtx(auction) });

@@ -346,6 +346,12 @@
     color: var(--text);
 }
 #compare h3:first-of-type { margin-top: 0; }
+/* One section per recorded table: the open room, then the closed room. */
+#compare-recorded > section + section {
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
+}
 /* The BEN section under the recorded one: set apart. */
 #compare-recorded:not([hidden]) + #compare-ben {
     margin-top: var(--space-4);

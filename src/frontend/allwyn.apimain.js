@@ -16,7 +16,7 @@ import { initTheme } from './allwyn.theme.js';
 import {
     tableResult, scorecardRow, weThey, totals, toCsv, contractText, outcomeText, boardLines,
 } from './allwyn.scorecard.js';
-import { parseDealFile } from './allwyn.dealfile.js';
+import { parseDealFile, groupTables } from './allwyn.dealfile.js';
 import {
     BenApi, DealRunner, reviewDecisions, playBenVersion, compareResults, contractString,
     normaliseCall, isLegalCall,
@@ -50,10 +50,10 @@ const ui = {
     resultCompare: $('#result-compare'),
     resultYouLabel: $('#result-you-label'),
     resultOthers: $('#result-others'),
-    resultRecRow: $('#result-rec-row'),
-    resultBenRow: $('#result-ben-row'),
+    resultOthersBody: $('#result-others-body'),
     compareRecorded: $('#compare-recorded'),
-    compareRecordedBody: $('#compare-recorded-body'),
+    roomField: $('#room-field'),
+    room: $('#room-select'),
     compareBen: $('#compare-ben'),
     compareBenStart: $('#compare-ben-start'),
     resultShowCompare: $('#result-show-compare'),
@@ -120,7 +120,11 @@ function humanSeat() {
     return 'NESW'.indexOf(ui.seat.value || '-');
 }
 
+// Boards as grouped from the file: a team match's open and closed rooms of
+// a board are one entry, with a table each (see groupTables).
 let boards = [];
+let currentGroup = null;      // the board being played, with all its tables
+let preferredRoom = '';       // the room last picked, kept from board to board
 let fileName = '';            // the deal file loaded, whose scorecard is shown
 let runner = null;
 let running = false;          // playing continuously, as opposed to stepping
@@ -178,13 +182,14 @@ ui.file.addEventListener('change', async () => {
         return;
     }
 
-    boards = parsed.boards;
+    boards = groupTables(parsed.boards);
     fileName = file.name;
     renderScorecard();
     ui.board.replaceChildren(...boards.map((board, i) => {
         const option = document.createElement('option');
         option.value = String(i);
-        option.textContent = `${board.label} (dealer ${board.dealer}, vul ${board.vul})`;
+        const rooms = board.tables.length > 1 ? ', open & closed rooms' : '';
+        option.textContent = `${board.label} (dealer ${board.dealer}, vul ${board.vul}${rooms})`;
         return option;
     }));
     ui.board.disabled = boards.length === 0;
@@ -199,17 +204,49 @@ ui.file.addEventListener('change', async () => {
         return;
     }
     const skipped = parsed.errors.length ? ` Skipped ${parsed.errors.length}: ${parsed.errors.join('; ')}` : '';
+    const tables = parsed.boards.length !== boards.length ? ` (${parsed.boards.length} tables)` : '';
     setStatus(parsed.errors.length ? 'error' : 'idle',
-        `${file.name}: ${boards.length} deal${boards.length === 1 ? '' : 's'}.${skipped}`);
+        `${file.name}: ${boards.length} board${boards.length === 1 ? '' : 's'}${tables}.${skipped}`);
+    fillRooms();
     loadBoard();
 });
 
-ui.board.addEventListener('change', loadBoard);
+ui.board.addEventListener('change', () => {
+    fillRooms();
+    loadBoard();
+});
+
+ui.room.addEventListener('change', () => {
+    preferredRoom = ui.room.selectedOptions[0]?.textContent ?? '';
+    loadBoard();
+});
+
+/**
+ * The Room box, for a board played in more than one room: which table to sit
+ * at - whose names are round the table - keeping the room picked last time.
+ * Every room's result is compared against whichever you play.
+ */
+function fillRooms() {
+    const group = boards[Number(ui.board.value)];
+    const tables = group?.tables ?? [];
+    ui.room.replaceChildren(...tables.map((table, i) => {
+        const option = document.createElement('option');
+        option.value = String(i);
+        option.textContent = table.room ?? `Table ${i + 1}`;
+        option.title = SEAT_NAMES.map((name, seat) => `${name}: ${table.players?.[seat] ?? '?'}`).join(', ');
+        return option;
+    }));
+    const preferred = tables.findIndex((t) => t.room === preferredRoom);
+    ui.room.value = String(preferred >= 0 ? preferred : 0);
+    ui.roomField.hidden = tables.length < 2;
+}
 
 /** Put the chosen board on the table, ready to play. */
 function loadBoard() {
-    const board = boards[Number(ui.board.value)];
+    const group = boards[Number(ui.board.value)];
+    const board = group?.tables[Number(ui.room.value)] ?? group?.tables[0];
     if (!board) return;
+    currentGroup = group;
     generation += 1;
     running = false;
     driving = false;
@@ -240,12 +277,11 @@ function loadBoard() {
     benStarted = false;
     ui.compare.hidden = true;
     ui.compareRecorded.hidden = true;
-    ui.compareRecordedBody.replaceChildren();
+    ui.compareRecorded.replaceChildren();
     ui.compareBen.hidden = true;
     ui.compareBenStart.hidden = true;
     ui.resultOthers.hidden = true;
-    ui.resultRecRow.hidden = true;
-    ui.resultBenRow.hidden = true;
+    ui.resultOthersBody.replaceChildren();
     ui.resultCompare.hidden = true;
     ui.resultCompare.className = 'result-compare';
     ui.resultYouLabel.hidden = true;
@@ -446,14 +482,16 @@ function setStatus(status, detail) {
 function onDealEnd() {
     dealEndHandled = true;
     const seat = humanSeat();
-    const recorded = runner.board.recorded;
-    recordOnScorecard(runner, seat);
+    // Every table the file records for this board: one, or both rooms.
+    const recordings = recordedTablesOf(currentGroup);
+    const recorded = recordings.length > 0;
+    recordOnScorecard(runner, seat, recordings);
     if (!recorded && seat < 0) return;
 
     ui.compare.hidden = false;
     ui.resultYouLabel.textContent = seat < 0 ? "BEN's table" : 'Your table';
     ui.resultYouLabel.hidden = false;
-    if (recorded) showRecorded(runner, recorded, seat);
+    if (recorded) showRecorded(runner, recordings, seat);
 
     if (seat >= 0) {
         ui.compareBen.hidden = false;
@@ -461,7 +499,8 @@ function onDealEnd() {
             ui.compareBenStart.hidden = false;
             ui.resultShowCompare.textContent = 'Compare with BEN';
             ui.resultShowCompare.hidden = false;
-            ui.progress.textContent = 'Deal complete. Compared with the recorded table; Compare with BEN for more.';
+            ui.progress.textContent = `Deal complete. Compared with ${recordings.length > 1
+                ? 'the open and closed rooms' : 'the recorded table'}; Compare with BEN for more.`;
         } else {
             compareWithBen();
         }
@@ -483,18 +522,48 @@ function recordedTable(recorded, board) {
     };
 }
 
-/** Your table against the one recorded in the file: panel section and result-box row. */
-function showRecorded(played, recorded, seat) {
-    const table = recordedTable(recorded, played.board);
+/** The tables the file records for a board: [{label, recorded}], open room first. */
+function recordedTablesOf(group) {
+    return (group?.tables ?? [])
+        .filter((table) => table.recorded)
+        .map((table) => ({ label: table.room ?? 'Recorded', recorded: table.recorded }));
+}
+
+/**
+ * Your table against each one recorded in the file: a panel section and a
+ * result-box row for each - the recorded table, or the open and closed rooms.
+ */
+function showRecorded(played, recordings, seat) {
     const you = seat < 0 ? 'BEN' : 'You';
-    $('#compare-recorded-title').textContent = seat < 0
-        ? "BEN's table against the recorded one"
-        : 'Against the recorded table';
-    renderTables(ui.compareRecordedBody, played, table, seat, {
-        you, other: 'Recorded', otherLong: 'the recorded table',
+    const sections = recordings.map(({ label, recorded }) => {
+        const table = recordedTable(recorded, played.board);
+        const otherLong = label === 'Recorded' ? 'the recorded table' : `the ${label.toLowerCase()}`;
+        const section = document.createElement('section');
+        const title = document.createElement('h3');
+        title.textContent = seat < 0 ? `BEN's table against ${otherLong}` : `Against ${otherLong}`;
+        const body = document.createElement('div');
+        renderTables(body, played, table, seat, { you, other: label, otherLong });
+        section.append(title, body);
+        addResultRow(label.replace(/ room$/, ''), table, played, seat);
+        return section;
     });
+    ui.compareRecorded.replaceChildren(...sections);
     ui.compareRecorded.hidden = false;
-    resultRow(ui.resultRecRow, table, played, seat);
+}
+
+/** A row on the result box for another table: "Open", "Closed", "Recorded", "BEN". */
+function addResultRow(label, other, yours, seat) {
+    const row = document.createElement('tr');
+    const th = document.createElement('th');
+    th.textContent = label;
+    row.appendChild(th);
+    for (const className of ['contract', 'made', 'score', 'diff']) {
+        const td = document.createElement('td');
+        td.className = className;
+        row.appendChild(td);
+    }
+    ui.resultOthersBody.appendChild(row);
+    resultRow(row, other, yours, seat);
 }
 
 /**
@@ -555,8 +624,8 @@ async function compareWithBen() {
     }
     if (cancelled() || !ben) return;
     renderTables(ui.compareResult, played, ben, seat, { you: 'You', other: 'BEN', otherLong: 'BEN' });
-    resultRow(ui.resultBenRow, ben, played, seat);
-    updateScorecard(scorecardKey(played.board), {
+    addResultRow('BEN', ben, played, seat);
+    updateScorecard(scorecardKey(currentGroup), {
         ben: tableResult(ben.contract, ben.result.tricks_taken, ben.result.score),
     });
     status('');
@@ -816,21 +885,26 @@ function scorecardRows() {
     return scorecards[fileName] ?? [];
 }
 
-function scorecardKey(board) {
-    return board.label;
+/** A board's key on the scorecard: the board, whichever room it was played in. */
+function scorecardKey(group) {
+    return group.label;
 }
 
-/** A finished deal onto the scorecard - replacing the row if the board was played before. */
-function recordOnScorecard(played, seat) {
-    const board = played.board;
-    const recorded = board.recorded;
+/**
+ * A finished deal onto the scorecard, with every recorded table for the board
+ * - replacing the row if the board was played before, in either room.
+ */
+function recordOnScorecard(played, seat, recordings) {
+    const group = currentGroup;
     const row = scorecardRow({
-        key: scorecardKey(board),
-        board: board.board,
-        label: board.label,
+        key: scorecardKey(group),
+        board: group.board,
+        label: played.board.label,
         seat,
         ours: tableResult(played.contract, played.result.tricks_taken, played.result.score),
-        recorded: recorded ? tableResult(recorded.contract, recorded.tricks, recorded.score) : null,
+        recorded: recordings.map(({ label, recorded }) => ({
+            label, result: tableResult(recorded.contract, recorded.tricks, recorded.score),
+        })),
     });
     const rows = scorecardRows().filter((r) => r.key !== row.key);
     rows.push(row);
@@ -909,22 +983,19 @@ function scorecardBoard(row) {
     return body;
 }
 
-/** A total line per table that has any scores. */
+/** A total line per table that has any scores: You, each recorded table, BEN. */
 function scorecardTotals(rows) {
-    const sum = totals(rows);
-    const labels = { ours: 'You', recorded: 'Recorded', ben: 'BEN' };
-    if (rows.length && rows.every((r) => r.seat < 0)) labels.ours = 'BEN (all four)';
     const lines = [];
-    for (const table of ['ours', 'recorded', 'ben']) {
-        if (!rows.some((r) => Number.isFinite(r[table]?.score))) continue;
+    for (const { key, label, we, they } of totals(rows)) {
         const tr = document.createElement('tr');
         tr.appendChild(cell('', lines.length === 0 ? 'Total' : ''));
-        tr.appendChild(cell('sc-table', labels[table]));
+        const name = key === 'ours' && rows.length && rows.every((r) => r.seat < 0) ? 'BEN (all four)' : label;
+        tr.appendChild(cell('sc-table', name));
         const blank = cell('', '');
         blank.colSpan = 2;
         tr.appendChild(blank);
-        tr.appendChild(cell('sc-num', sum[table].we));
-        tr.appendChild(cell('sc-num', sum[table].they));
+        tr.appendChild(cell('sc-num', we));
+        tr.appendChild(cell('sc-num', they));
         lines.push(tr);
     }
     return lines;

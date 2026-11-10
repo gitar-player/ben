@@ -10,7 +10,7 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parsePbn, parseLin, parseDealFile, boardDealer, boardVulnerability } from './allwyn.dealfile.js';
+import { parsePbn, parseLin, parseDealFile, boardDealer, boardVulnerability, groupTables } from './allwyn.dealfile.js';
 import {
     normaliseCall, auctionToCtx, auctionIsOver, isLegalCall, contractFromAuction,
     contractString, scoreContract, BenApi, DealRunner, ApiError,
@@ -125,6 +125,31 @@ await check('player names: PBN tags, LIN pn| (S W N E), the closed room of a vug
     const [teamOpen, teamClosed] = parseLin(teams).boards;
     assert.deepEqual(teamOpen.players, ['n1', 'e1', 's1', 'w1']);
     assert.deepEqual(teamClosed.players, ['n2', 'e2', 's2', 'w2']);
+});
+
+await check('team matches: open and closed rooms of a board group into one, open first', () => {
+    const md = 'md|3SAJ9HAQT6DJT62C98,SQ8762HKJ54DA93C7,ST5H982D874CAQ632,|';
+    const other = 'md|3SQ8762HKJ54DA93C7,SAJ9HAQT6DJT62C98,ST5H982D874CAQ632,|';
+    const lin = `qx|c1|pn|s2,w2,n2,e2|${md}ah|Board 1|mb|p|mb|p|mb|p|mb|p|pg||`
+        + `qx|o1|pn|s1,w1,n1,e1|${md}ah|Board 1|mb|1C|mb|p|mb|p|mb|p|pc|SA|mc|8|pg||`
+        + `qx|o2|${other}ah|Board 2|pg||`;
+    const deals = parseLin(lin).boards;
+    assert.deepEqual(deals.map((d) => d.room), ['Closed room', 'Open room', 'Open room']);
+    const groups = groupTables(deals);
+    assert.equal(groups.length, 2);
+    assert.equal(groups[0].label, 'Board 1');
+    assert.deepEqual(groups[0].tables.map((t) => t.room), ['Open room', 'Closed room']);
+    assert.equal(groups[0].tables[0].recorded.score, 90);      // 1C+1 by North (8 tricks): N-S +90
+    assert.equal(groups[0].tables[1].recorded.passedOut, true);
+    assert.equal(groups[1].tables.length, 1);
+
+    // PBN's [Room] tag does the same; different cards under one number stay apart.
+    const pbnRoom = (room, deal) => `[Board "4"]\n[Room "${room}"]\n[Deal "N:${deal}"]\n`;
+    const swapped = [HANDS[1], HANDS[0], HANDS[2], HANDS[3]].join(' ');
+    const fromPbn = groupTables(parsePbn(pbnRoom('Open', HANDS.join(' ')) + pbnRoom('Closed', HANDS.join(' '))
+        + pbnRoom('Open', swapped)).boards);
+    assert.deepEqual(fromPbn.map((g) => g.tables.length), [2, 1]);
+    assert.equal(fromPbn[0].label, 'Board 4');
 });
 
 await check('parseDealFile picks by extension, then by content', () => {
@@ -683,18 +708,19 @@ await check('scorecard: We/They by seat, result text, totals and CSV', () => {
 
     const rows = [
         scorecardRow({ key: 'b1', board: '1', label: 'Board 1', seat: 2,
-            ours: tableResult(c(3, 'D', 0), 8, -50), recorded: tableResult(c(3, 'D', 0), 9, 110),
+            ours: tableResult(c(3, 'D', 0), 8, -50), recorded: [{ label: 'Recorded', result: tableResult(c(3, 'D', 0), 9, 110) }],
             ben: tableResult(c(3, 'N', 2), 9, 400) }),
         scorecardRow({ key: 'b2', board: '2', label: 'Board 2', seat: 2,
-            ours: tableResult(c(3, 'S', 1), 9, -140), recorded: null }),
-        scorecardRow({ key: 'b5', board: '5', label: 'Board 5', seat: 2,
-            ours: tableResult(null, null, 0), recorded: tableResult(c(1, 'N', 1), 7, -90) }),
+            ours: tableResult(c(3, 'S', 1), 9, -140) }),
+        // Saved before team matches: one recorded result, not a list.
+        { ...scorecardRow({ key: 'b5', board: '5', label: 'Board 5', seat: 2, ours: tableResult(null, null, 0) }),
+            recorded: tableResult(c(1, 'N', 1), 7, -90) },
     ];
-    assert.deepEqual(totals(rows), {
-        ours: { we: 0, they: 190 },
-        recorded: { we: 110, they: 90 },
-        ben: { we: 400, they: 0 },
-    });
+    assert.deepEqual(totals(rows).map(({ label, we, they }) => [label, we, they]), [
+        ['You', 0, 190],
+        ['Recorded', 110, 90],
+        ['BEN', 400, 0],
+    ]);
 
     assert.equal(contractText(rows[0].ours), '3DN');
     assert.equal(outcomeText(rows[0].ours), '-1');
@@ -704,6 +730,15 @@ await check('scorecard: We/They by seat, result text, totals and CSV', () => {
     assert.deepEqual(boardLines(rows[0]).map((l) => l.label), ['You', 'Recorded', 'BEN']);
     const allFour = scorecardRow({ key: 'b9', board: '9', label: 'Board 9', seat: -1, ours: tableResult(null, null, 0) });
     assert.deepEqual(boardLines(allFour).map((l) => l.label), ['BEN (all four)', 'Recorded']);
+
+    // A team match: a line per room, and totals per room.
+    const team = scorecardRow({ key: 'b7', board: '7', label: 'Board 7', seat: 1,
+        ours: tableResult(c(4, 'S', 1), 10, -420),
+        recorded: [{ label: 'Open room', result: tableResult(c(4, 'S', 1), 9, 50) },
+            { label: 'Closed room', result: tableResult(c(4, 'S', 1), 10, -420) }] });
+    assert.deepEqual(boardLines(team).map((l) => l.label), ['You', 'Open room', 'Closed room', 'BEN']);
+    assert.deepEqual(totals([team]).map(({ label, we, they }) => [label, we, they]),
+        [['You', 420, 0], ['Open room', 0, 50], ['Closed room', 420, 0]]);
 
     const csv = toCsv(rows).trim().split('\n');
     assert.deepEqual(csv, [

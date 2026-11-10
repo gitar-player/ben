@@ -5,7 +5,8 @@
  *
  *   { label, board, dealer: 'N'|'E'|'S'|'W', vul: 'None'|'NS'|'EW'|'Both',
  *     hands: [north, east, south, west],       // PBN holdings, "AK4.QJ.T98.65432"
- *     players: [north, east, south, west] }    // names as the file gives them, or null
+ *     players: [north, east, south, west],     // names as the file gives them, or null
+ *     room: 'Open room' | 'Closed room' | null } // which table, in a team match
  *
  * plus, when the file records how the board went at the table:
  *
@@ -172,8 +173,11 @@ function pbnGame(tags) {
         : boardVulnerability(board || 1);
 
     const event = tags.Event && tags.Event !== '?' ? tags.Event : '';
+    const roomTag = (tags.Room ?? '').trim().toLowerCase();
+    const room = roomTag === 'open' ? 'Open room' : roomTag === 'closed' ? 'Closed room' : null;
     return {
-        label: [board ? `Board ${board}` : 'Deal', event].filter(Boolean).join(' - '),
+        label: [board ? `Board ${board}` : 'Deal', event, room].filter(Boolean).join(' - '),
+        room,
         board,
         dealer,
         vul,
@@ -373,6 +377,7 @@ function linDeal(segment, lookBack, header = '') {
     const roomName = room ? (room.toLowerCase() === 'o' ? 'Open room' : 'Closed room') : '';
     return {
         label: [board ? `Board ${board}` : 'Deal', roomName].filter(Boolean).join(' - '),
+        room: roomName || null,
         board,
         dealer,
         vul,
@@ -427,6 +432,42 @@ function linRecorded(segment, dealer, vul) {
         }
     }
     return recording(auction, contract, false, tricks, vul);
+}
+
+/* ------------------------------------------------------------- team matches */
+
+/**
+ * The same board played at more than one table - a team match's open and
+ * closed rooms - as one entry: { board, label, dealer, vul, hands, tables },
+ * where tables are the deals as read, one per room, open room first. A deal
+ * stands alone when no other has the same board number and cards.
+ */
+export function groupTables(boards) {
+    const groups = [];
+    const byKey = new Map();
+    for (const deal of boards) {
+        const key = deal.board ? `${deal.board}|${deal.hands.join(' ')}` : null;
+        const group = key ? byKey.get(key) : undefined;
+        if (group) {
+            group.tables.push(deal);
+            continue;
+        }
+        const fresh = {
+            board: deal.board,
+            label: deal.room ? deal.label.replace(/ - (Open|Closed) room$/, '') : deal.label,
+            dealer: deal.dealer,
+            vul: deal.vul,
+            hands: deal.hands,
+            tables: [deal],
+        };
+        groups.push(fresh);
+        if (key) byKey.set(key, fresh);
+    }
+    for (const group of groups) {
+        const order = (d) => (d.room === 'Open room' ? 0 : d.room === 'Closed room' ? 1 : 2);
+        group.tables.sort((a, b) => order(a) - order(b));
+    }
+    return groups;
 }
 
 /* ------------------------------------------------------------------ either */

@@ -1,7 +1,8 @@
-[Start Playing](http://localhost:8080/app/allwyn-api.html)
+# Bridge
 
+[StartPlaying](https://localhost:8080/app/allwyn-api.html)
 
-# Bridge Engine
+[BridgeBaseHistory](https://www.bridgebase.com/myhands/myhands_login.php?t=%2Fmyhands%2Findex.php%3F)
 
 This is a game engine for [bridge](https://en.wikipedia.org/wiki/Contract_bridge).
 It can be used as a robot player, to do analysis, or to develop AI for bridge.
@@ -220,6 +221,12 @@ What it reads and does:
   open/closed room), and BBO handviewer URLs with the lin in the query string. A blank East hand
   is worked out from the other three.
 - Any auction or play already in the file is ignored - BEN bids and plays the deal afresh.
+- Team matches: when a board was played in an open and a closed room - LIN `qx|o…`/`qx|c…`,
+  or PBN `[Room "Open"]`/`[Room "Closed"]`, same board number and cards - the Board list shows it
+  once and a **Room** box picks the table to sit at (whose names are round the table; the choice
+  carries over to the next board). Whichever room you play, your result is compared with both:
+  an Open and a Closed row on the result box, a section each in the side panel, and a line each
+  on the scorecard, which keys the board as one whichever room it was played in.
 - Player names in the file - PBN `[North]`, `[East]`, `[South]`, `[West]`, or LIN `pn|`
   (South, West, North, East; a vugraph's closed room takes the second four) - are shown beside
   the seats on the felt. BBO robots (`~~M...`) show as "Robot", with the full name on hover; the
@@ -279,6 +286,47 @@ Startup output goes to `logs/launchd.log`.
 While the agent is loaded it owns ports 8080 and 4443, so a manual `./start_ben.sh` stops at
 the "already in use" guard. Don't use `--force` to get around it - the agent restarts its own
 copy 30s later and the two fight over the ports. Run `launchctl bootout` first.
+
+#### Restarting everything (macOS, with the launchd agent)
+
+Three servers make up the web app: `appserver.py` (8080, the pages), `gameserver.py` (4443, the
+websocket game behind `allwyn.html`) and `gameapi.py` (8085, the REST API behind
+`allwyn-api.html`). The agent starts the first two; the API needs `--api` (below) or its own
+terminal.
+
+1. Restart the app server and game server:
+
+   ```bash
+   launchctl kickstart -k gui/$(id -u)/com.ben.app
+   ```
+
+2. Start the BEN API in its own terminal (skip this if the agent runs it with `--api`):
+
+   ```bash
+   cd ~/AllwynDev/ben/src
+   DYLD_LIBRARY_PATH=../bin/BGA/macos/arm64 ~/anaconda3/envs/TF2/bin/python gameapi.py
+   ```
+
+   The first request after it starts takes 5-15s while the models load.
+
+3. Open <http://localhost:8080/app/allwyn-api.html> (or <http://localhost:8080/home> for the
+   game-server UI) and reload it.
+
+To have the agent start the API too - so step 1 alone restarts all three, and they come back
+after a reboot - add `--api` to its arguments once:
+
+```bash
+launchctl bootout gui/$(id -u)/com.ben.app
+plutil -insert ProgramArguments.2 -string --api ~/Library/LaunchAgents/com.ben.app.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ben.app.plist
+```
+
+To stop everything: `launchctl bootout gui/$(id -u)/com.ben.app`, and Ctrl-C the API's terminal
+if it has one. To check what is up:
+
+```bash
+for p in 8080 4443 8085; do printf "%s: " $p; lsof -ti tcp:$p -sTCP:LISTEN >/dev/null && echo up || echo down; done
+```
 
 Following are instructions to start the service by hand:
 

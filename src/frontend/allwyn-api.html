@@ -53,6 +53,10 @@
                         <option>Load a .pbn or .lin file</option>
                     </select>
                 </label>
+                <label class="field" id="room-field" hidden>
+                    <span>Room</span>
+                    <select id="room-select"></select>
+                </label>
                 <label class="field field-api">
                     <span>BEN API</span>
                     <input type="url" id="api-base" spellcheck="false" autocomplete="off">
@@ -125,16 +129,7 @@
                     <!-- The same board elsewhere: as recorded in the file, and as BEN
                          played it. One compact row each, against the result above. -->
                     <table id="result-others" class="result-others" hidden>
-                        <tbody>
-                            <tr id="result-rec-row" hidden>
-                                <th>Recorded</th><td class="contract"></td><td class="made"></td>
-                                <td class="score"></td><td class="diff"></td>
-                            </tr>
-                            <tr id="result-ben-row" hidden>
-                                <th>BEN</th><td class="contract"></td><td class="made"></td>
-                                <td class="score"></td><td class="diff"></td>
-                            </tr>
-                        </tbody>
+                        <tbody id="result-others-body"></tbody>
                     </table>
                     <!-- Where the comparison with BEN is up to, when you played a seat. -->
                     <div id="result-compare" class="result-compare" aria-live="polite" hidden></div>
@@ -197,11 +192,9 @@
             <!-- Filled in after a deal you played: BEN in your seat, and BEN at all four. -->
             <section id="compare" class="panel" aria-label="Your deal compared" hidden>
                 <h2>Comparison</h2>
-                <!-- Against the result recorded in the file, when it has one. -->
-                <div id="compare-recorded" hidden>
-                    <h3 id="compare-recorded-title">Against the recorded table</h3>
-                    <div id="compare-recorded-body"></div>
-                </div>
+                <!-- Against each table recorded in the file - one, or a team
+                     match's open and closed rooms. -->
+                <div id="compare-recorded" hidden></div>
                 <!-- Against BEN: automatic without a recorded result, on request with one. -->
                 <div id="compare-ben" hidden>
                     <h3>Against BEN</h3>

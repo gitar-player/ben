@@ -23,10 +23,21 @@ export function tableResult(contract, tricks, score) {
 
 /**
  * One scorecard row. `seat` is the seat played from (-1 when BEN played all
- * four, which counts North-South as "we"). `recorded` and `ben` may be null.
+ * four, which counts North-South as "we"). `recorded` lists the tables the
+ * file records - [{label: 'Open room', result}, ...], empty when none - and
+ * `ben` may be null.
  */
-export function scorecardRow({ key, board, label, seat, ours, recorded = null, ben = null }) {
+export function scorecardRow({ key, board, label, seat, ours, recorded = [], ben = null }) {
     return { key, board, label, seat, ours, recorded, ben, when: new Date().toISOString() };
+}
+
+/**
+ * A row's recorded tables. Rows saved before team matches were handled hold
+ * one result, or null, rather than a list; they read as one "Recorded" table.
+ */
+export function recordedTables(row) {
+    if (Array.isArray(row.recorded)) return row.recorded;
+    return row.recorded ? [{ label: 'Recorded', result: row.recorded }] : [];
 }
 
 /**
@@ -79,26 +90,38 @@ export function outcomeText(result) {
  * there is no separate BEN line.
  */
 export function boardLines(row) {
-    const lines = [
-        { table: 'ours', label: row.seat < 0 ? 'BEN (all four)' : 'You', result: row.ours, missing: '' },
-        { table: 'recorded', label: 'Recorded', result: row.recorded, missing: 'not in file' },
-    ];
+    const lines = [{ table: 'ours', label: row.seat < 0 ? 'BEN (all four)' : 'You', result: row.ours, missing: '' }];
+    const recorded = recordedTables(row);
+    if (recorded.length === 0) {
+        lines.push({ table: 'recorded', label: 'Recorded', result: null, missing: 'not in file' });
+    }
+    for (const { label, result } of recorded) {
+        lines.push({ table: 'recorded', label, result, missing: 'no result recorded' });
+    }
     if (row.seat >= 0) lines.push({ table: 'ben', label: 'BEN', result: row.ben, missing: 'not compared yet' });
     return lines;
 }
 
-/** Column totals for We and They at each table, over rows that have that table. */
+/**
+ * We and They totals for each table that has any scores - You, each recorded
+ * table by name (Open room, Closed room, Recorded), BEN - in that order.
+ */
 export function totals(rows) {
-    const sum = { ours: { we: 0, they: 0 }, recorded: { we: 0, they: 0 }, ben: { we: 0, they: 0 } };
+    const sums = new Map();
     for (const row of rows) {
-        for (const table of ['ours', 'recorded', 'ben']) {
-            const split = weThey(row[table]?.score, row.seat);
+        for (const line of boardLines(row)) {
+            const split = weThey(line.result?.score, row.seat);
             if (!split) continue;
-            sum[table].we += split.we ?? 0;
-            sum[table].they += split.they ?? 0;
+            const key = line.table === 'recorded' ? `recorded:${line.label}` : line.table;
+            const label = line.table === 'ours' ? 'You' : line.label;
+            const sum = sums.get(key) ?? { key, label, we: 0, they: 0 };
+            sum.we += split.we ?? 0;
+            sum.they += split.they ?? 0;
+            sums.set(key, sum);
         }
     }
-    return sum;
+    const rank = (key) => (key === 'ours' ? 0 : key === 'ben' ? 2 : 1);
+    return [...sums.values()].sort((a, b) => rank(a.key) - rank(b.key));
 }
 
 /**
